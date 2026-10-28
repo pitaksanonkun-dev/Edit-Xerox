@@ -26,7 +26,6 @@
 #include "Discovery.h"
 #include "HostDns.h"
 #include "LogStore.h"
-#include "PrinterBook.h"
 #include "PrinterMon.h"
 #include "Relay.h"
 #include "Resolver.h"
@@ -64,6 +63,17 @@ static void onNetEvent(arduino_event_id_t event) {
     default:
       break;
   }
+}
+
+// v1.3.0 dropped the copier address-book import: free the flash its files used.
+static void removeOldBooks() {
+  File dir = LittleFS.open("/book");
+  if (!dir || !dir.isDirectory()) return;
+  std::vector<String> files;
+  for (File f = dir.openNextFile(); f; f = dir.openNextFile()) files.push_back(String("/book/") + f.name());
+  dir.close();
+  for (auto& p : files) LittleFS.remove(p);
+  LittleFS.rmdir("/book");
 }
 
 static void checkFactoryReset() {
@@ -134,7 +144,7 @@ void setup() {
   checkFactoryReset();
   configLoad();
   stateLoad();
-  bookLoadMeta();
+  removeOldBooks();
   logStoreBegin();
   startEthernet();
   webBegin();

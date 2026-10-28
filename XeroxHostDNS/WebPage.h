@@ -37,7 +37,7 @@ dialog form{padding:16px 18px;max-height:90vh;overflow:auto}
 .vr{display:flex;gap:10px;padding:8px 12px;border-top:1px solid var(--line);font-size:13px}.vr .ic{width:20px;height:20px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff}
 .ic.ok{background:var(--ok)}.ic.warn{background:var(--warn)}.ic.fail{background:var(--bad)}.ic.wait,.ic.skip{background:#cbd5e1}.ic.run{border:2px solid #cfe0fb;border-top-color:var(--pri);background:none;animation:sp 0.8s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
-input.chg{border-color:var(--ok)!important;box-shadow:0 0 0 3px rgba(20,136,62,.25);background:#f3fbf5}.chgnote{color:var(--ok);font-size:12px;font-weight:600;margin-top:3px}.vr .d{color:var(--mut);font-size:12px;margin-top:2px}dialog h3{margin:0 0 6px;font-size:16px}.dbtn{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.vr .d{color:var(--mut);font-size:12px;margin-top:2px}dialog h3{margin:0 0 6px;font-size:16px}.dbtn{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
 #toast{position:fixed;right:16px;bottom:16px;background:#14213d;color:#fff;padding:10px 14px;border-radius:8px;display:none;max-width:90vw}
 .sm{font-size:12px;color:var(--mut)}.pick{margin-top:10px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fafbfc}
 .pick table{min-width:0}.pick .tw{max-height:260px;overflow:auto}.pick td,.pick th{padding:5px 6px}ol{margin:6px 0 0 18px;padding:0}li{margin:3px 0}
@@ -69,8 +69,7 @@ input.chg{border-color:var(--ok)!important;box-shadow:0 0 0 3px rgba(20,136,62,.
 <section class="tab" id="t-printers">
  <div class="card"><h2>เครื่องพิมพ์ Xerox ที่ใช้งานผ่าน ESP32 นี้ (DNS / Relay)</h2>
  <div class="bar"><button class="btn p" onclick="editPrinter(-1)">+ เพิ่มเครื่องพิมพ์</button></div>
- <div class="tw"><table><thead><tr><th>ชื่อ</th><th>IP</th><th>รุ่น / ที่ตั้ง</th><th>สถานะ</th><th>สมุดที่อยู่ (ชื่อ Scan)</th><th>DNS Query</th><th>Query ล่าสุด</th><th></th></tr></thead><tbody id="prnRows"></tbody></table></div></div>
- <div class="card"><h2>นำเข้าสมุดที่อยู่ (ชื่อ Scan) จากเครื่อง Xerox</h2><ol id="guideBook"></ol></div>
+ <div class="tw"><table><thead><tr><th>ชื่อ</th><th>IP</th><th>รุ่น / ที่ตั้ง</th><th>สถานะ</th><th>DNS Query</th><th>Query ล่าสุด</th><th></th></tr></thead><tbody id="prnRows"></tbody></table></div></div>
  <div class="card"><h2>วิธีตั้งค่า Xerox AltaLink C8155 – โหมด Relay (แนะนำ)</h2><ol id="guideRelay"></ol></div>
  <div class="card"><h2>วิธีตั้งค่า Xerox AltaLink C8155 – โหมด DNS (Address Type = Host Name)</h2><ol id="guide"></ol></div>
 </section>
@@ -171,7 +170,7 @@ function render(){const d=S.device,st=S.stats;
   .map(k=>`<div class="card kpi"><div class="v">${esc(k[0])}</div><div class="l">${k[1]}</div></div>`).join('');
  $('#devTbl').innerHTML=[['IP / Mask',`${d.ip} / ${d.mask}`],['Gateway',d.gw],['DNS ของ ESP32',d.dns],['MAC',d.mac],['ชื่ออุปกรณ์',d.hostname],['โหมด IP',d.dhcp?'DHCP':'Static'],['ลิงก์',d.link?`${d.speed} Mbps ${d.duplex}`:'ไม่เชื่อมต่อ'],['หน่วยความจำว่าง',d.heap+' bytes'],['DNS query ทั้งหมด',`${st.queries} (ปฏิเสธ ${st.refused}, ล้มเหลว ${st.failed})`]]
   .map(r=>`<tr><th style="width:200px">${r[0]}</th><td class="mono">${esc(r[1])}</td></tr>`).join('');
- $('#hostRows').innerHTML=S.hosts.length?S.hosts.map((h,i)=>`<tr><td>${h.scanName?`<b>${esc(h.scanName)}</b>`:'<span class="b mut">ยังไม่มีชื่อ Scan – กด แก้ไข → Verify</span>'}<div class="sm">Host: <span class="mono" style="color:var(--fg)">${esc(h.name)}</span></div>${h.mac?`<div class="sm mono">MAC ${esc(h.mac)}</div>`:''}${h.aliases?`<div class="sm">ชื่อแฝง: ${esc(h.aliases)}</div>`:''}${h.note?`<div class="sm">${esc(h.note)}</div>`:''}</td>
+ $('#hostRows').innerHTML=S.hosts.length?S.hosts.map((h,i)=>`<tr><td>${h.scanName?`<b>${esc(h.scanName)}</b>`:'<span class="b mut">ยังไม่มีชื่อ Scan – กด แก้ไข</span>'}<div class="sm">Host: <span class="mono" style="color:var(--fg)">${esc(h.name)}</span></div>${h.mac?`<div class="sm mono">MAC ${esc(h.mac)}</div>`:''}${h.aliases?`<div class="sm">ชื่อแฝง: ${esc(h.aliases)}</div>`:''}${h.note?`<div class="sm">${esc(h.note)}</div>`:''}</td>
   <td>${badge(h.status)}${h.fails>1?`<div class="sm">ไม่ตอบ ${h.fails} รอบ</div>`:''}</td>
   <td class="mono">${esc(h.ipv4||(h.fallback4?h.fallback4+' (สำรอง)':'-'))}</td><td class="mono">${h.ipv6.length?h.ipv6.map(esc).join('<br>'):'-'}</td>
   <td>${esc(h.method)}</td><td>${esc(h.lastSeen)}<div class="sm">${ago(h.ago)}</div></td>
@@ -184,12 +183,9 @@ function render(){const d=S.device,st=S.stats;
   <td>${r.ok?'<span class="b ok">':'<span class="b bad">'}${esc(r.result)}</span></td><td>${fmtB(r.bytes)}</td><td>${r.secs} วินาที</td></tr>`).join('')||'<tr><td colspan="7" class="sm">ยังไม่มีการส่งผ่าน Relay</td></tr>';
  $('#prnRows').innerHTML=S.printers.length?S.printers.map((p,i)=>`<tr><td><b>${esc(p.name)}</b>${p.note?`<div class="sm">${esc(p.note)}</div>`:''}</td><td class="mono">${esc(p.ip)}</td>
   <td>${esc(p.model)}<div class="sm">${esc(p.location)}</div></td><td>${!p.checked?'<span class="b mut">รอตรวจ</span>':p.online?'<span class="b ok">ออนไลน์</span>':'<span class="b bad">ออฟไลน์</span>'}</td>
-  <td>${p.bookCount?`<b>${p.bookCount}</b> รายการ Scan<div class="sm">${esc(p.bookDate)}</div>`:'<span class="sm">ยังไม่ได้นำเข้า</span>'}
-   <div style="margin-top:4px;white-space:nowrap"><label class="btn s" style="margin:0;color:inherit;display:inline-block">นำเข้า CSV<input type="file" accept=".csv,text/csv" style="display:none" onchange="importBook(${i},this)"></label>
-   ${p.bookCount?`<button class="btn s" onclick="viewBook(${i})">ดู</button> <button class="btn s d" onclick="clearBook(${i})">ล้าง</button>`:''}</div></td>
   <td>${p.dnsQueries}${p.dnsQueries?'':'<div class="sm">ยังไม่เคยใช้ DNS นี้</div>'}</td><td class="mono">${esc(p.lastQuery)}<div class="sm">${esc(p.lastQueryTime)}</div></td>
   <td style="white-space:nowrap"><a class="btn s" href="http://${esc(p.ip)}" target="_blank">เปิดหน้าเครื่อง</a> <button class="btn s" onclick="editPrinter(${i})">แก้ไข</button> <button class="btn s d" onclick="delPrinter(${i})">ลบ</button></td></tr>`).join('')
-  :'<tr><td colspan="8" class="sm">ยังไม่มีเครื่องพิมพ์ – กด "+ เพิ่มเครื่องพิมพ์"</td></tr>';
+  :'<tr><td colspan="7" class="sm">ยังไม่มีเครื่องพิมพ์ – กด "+ เพิ่มเครื่องพิมพ์"</td></tr>';
  $('#chgRows').innerHTML=S.changes.map(c=>`<tr><td>${esc(c.time)}</td><td>${esc(c.host)}</td><td class="mono">${esc(c.text)}</td></tr>`).join('')||'<tr><td colspan="3" class="sm">ยังไม่มีการเปลี่ยนแปลง</td></tr>';
  $('#qRows').innerHTML=S.queries.map(q=>`<tr><td>${esc(q.time)}</td><td>${esc(q.client)}</td><td class="mono">${esc(q.name)}</td><td>${esc(q.type)}</td><td class="mono">${esc(q.result)}</td></tr>`).join('')||'<tr><td colspan="5" class="sm">ยังไม่มี query</td></tr>';
  const rl=S.hosts.filter(h=>h.relayPort).map(h=>`<span class="mono">${esc(h.name)} → ${esc(d.ip)} : ${h.relayPort}</span>`).join(', ')||'(ยังไม่ได้กำหนดพอร์ต Relay ให้ Host ใด)';
@@ -207,10 +203,6 @@ function render(){const d=S.device,st=S.stats;
   `ไปที่ <b>Address Book → Scan To Destination</b>: Protocol = <b>SMB</b>, Address Type = <b>Host Name</b>, ช่อง <b>Host Name : Port</b> ใส่ชื่อเครื่อง เช่น <span class="mono">PC-ACC01</span> : <span class="mono">445</span> (ต้องตรงกับ Host ในแท็บ "เครื่องปลายทาง Scan") แล้วกรอก Share / Login Name / Password ตามเดิม`,
   `กด <b>Destination Test</b> – ถ้าผ่าน จะเห็นชื่อนั้นในแท็บ Log → DNS Query พร้อมผล LOCAL → IP ของเครื่อง`,
   `เพิ่มเครื่องพิมพ์ในหน้านี้เพื่อดูว่าเครื่องเริ่มถาม DNS แล้วหรือยัง (คอลัมน์ DNS Query)`].map(x=>`<li>${x}</li>`).join('');
- $('#guideBook').innerHTML=[`ที่เครื่อง Xerox (Embedded Web Server) Login เป็น Admin → <b>Address Book</b> → <b>Management / Import-Export</b> → <b>Export</b> เป็นไฟล์ CSV`,
-  `ในตารางด้านบน กด <b>นำเข้า CSV</b> ที่แถวของเครื่องนั้น – ระบบอ่านเฉพาะรายการ Scan (Nickname, Server, Port, Protocol) ไม่เก็บรหัสผ่าน`,
-  `ในหน้าเพิ่ม/แก้ไข Host กด <b>✔ Verify</b> – ระบบเทียบ Host Name / IP / พอร์ต Relay แล้วกรอก <b>ชื่อ Scan</b> ให้อัตโนมัติ (ถ้าเปลี่ยนจากเดิมจะขึ้นกรอบสีเขียว)`,
-  `เมื่อแก้สมุดที่อยู่ในเครื่อง Xerox ให้ Export และนำเข้าใหม่ แล้วกด Verify อีกครั้ง`].map(x=>`<li>${x}</li>`).join('');
 }
 
 function dialog(title,fields,vals,onOk,extra){$('#dlgTitle').textContent=title;
@@ -221,7 +213,7 @@ function dialog(title,fields,vals,onOk,extra){$('#dlgTitle').textContent=title;
 const hostCfg=()=>S.hosts.map(h=>({name:h.name,scanName:h.scanName,mac:h.mac,aliases:h.aliases,fallback4:h.fallback4,fallback6:h.fallback6,note:h.note,enabled:h.enabled,relayPort:h.relayPort}));
 const prnCfg=()=>S.printers.map(p=>({name:p.name,ip:p.ip,model:p.model,location:p.location,note:p.note}));
 function editHost(i){const v=i<0?{}:S.hosts[i];dialog(i<0?'เพิ่ม Host':'แก้ไข Host',[
- {k:'scanName',l:'ชื่อ Scan (ในเครื่อง Xerox)',ph:'เช่น test (Xerox ชั้น 2)',h:'ใช้อ้างอิงกับรายการ Scan ในเครื่อง Xerox · กรอกให้อัตโนมัติเมื่อกด Verify (เทียบ Host Name / IP / พอร์ตในสมุดที่อยู่ที่นำเข้าไว้) · แก้เองได้'},
+ {k:'scanName',l:'ชื่อ Scan (ในเครื่อง Xerox)',ph:'เช่น test (Xerox ชั้น 2)',h:'พิมพ์ Nickname ของรายการนี้ในสมุดที่อยู่ของเครื่อง Xerox – ใช้ดูว่า Host นี้ตรงกับรายการ Scan ไหน'},
  {k:'name',l:'Host Name (ชื่อเครื่องคอมพิวเตอร์)',req:1,ph:'PC-ACC01',h:'ควรตรงกับ Computer name ของ Windows (ถ้าใส่ MAC ด้านล่าง จะตั้งชื่ออะไรก็ได้)'},
  {k:'mac',l:'MAC Address (แนะนำ – ค้นหาแม่นยำที่สุด)',ph:'AA:BB:CC:DD:EE:FF',h:'ESP32 ตามหาเครื่องจาก MAC ด้วย ARP ซึ่ง Firewall ของ Windows ปิดกั้นไม่ได้ (เครื่องในวง LAN เดียวกัน)'},
  {k:'aliases',l:'ชื่อแฝง (คั่นด้วย ,)',ph:'scan-acc, pc-acc01.company.local',h:'ชื่ออื่นที่ตั้งไว้ในเครื่อง Xerox ให้ชี้ไปเครื่องเดียวกัน'},
@@ -234,47 +226,13 @@ function editHost(i){const v=i<0?{}:S.hosts[i];dialog(i<0?'เพิ่ม Host'
   <span class="sm">ไฟล์จากโปรแกรม MacCollector – ต้องมีชื่อเครื่องและ MAC อย่างน้อย · Verify = ตรวจว่า ESP32 ติดต่อคอมพิวเตอร์และเครื่องถ่ายเอกสารได้จริง</span></div>
   <div id="verify"></div><div id="pick"></div>`)}
 
-// ---- Copier address book (CSV exported from the Xerox EWS) ----
-function parseCsv(text){text=text.replace(/^﻿/,'');const first=text.split(/\r?\n/)[0]||'';
- const d=[',',';','\t'].map(c=>[c,first.split(c).length]).sort((a,b)=>b[1]-a[1])[0][0];
- const rows=[];let row=[],f='',q=false;
- for(let i=0;i<text.length;i++){const c=text[i];
-  if(q){if(c==='"'){if(text[i+1]==='"'){f+='"';i++}else q=false}else f+=c}
-  else if(c==='"')q=true;else if(c===d){row.push(f);f=''}else if(c==='\n'){row.push(f);rows.push(row);row=[];f=''}else if(c!=='\r')f+=c}
- if(f||row.length){row.push(f);rows.push(row)}return rows.filter(r=>r.some(x=>x.trim()))}
-// Finds the scan columns by header name (also "ScanNickName2"... for several destinations per contact).
-function bookEntries(rows){if(rows.length<2)throw new Error('ไฟล์ไม่มีข้อมูล');
- const H=rows[0].map(h=>h.trim().toLowerCase().replace(/[\s_\-.]/g,''));
- const R={nick:['scannickname','nickname','scanname','scandestinationname'],server:['scanserveraddress','serveraddress','scanserver','server','hostname','scanhostname','scanaddress'],
-  port:['scanserverport','serverport','scanport','port'],proto:['scantransferprotocol','transferprotocol','scanprotocol','protocol'],path:['scandocumentpath','documentpath','scanpath','path','share','scanshare']};
- const cols={};H.forEach((h,i)=>{const m=h.match(/^(.*?)(\d*)$/);for(const r in R)if(R[r].includes(m[1])){const c=cols[m[2]]=cols[m[2]]||{};if(c[r]===undefined)c[r]=i}});
- const disp=H.indexOf('displayname'),out=[];
- for(const row of rows.slice(1))for(const s in cols){const c=cols[s];if(c.server===undefined)continue;const server=(row[c.server]||'').trim();if(!server)continue;
-  out.push({nick:((c.nick!==undefined?row[c.nick]:'')||(disp>=0?row[disp]:'')||'').trim(),server,port:Number(row[c.port])||0,
-   proto:(c.proto!==undefined?row[c.proto]:'').trim(),path:(c.path!==undefined?row[c.path]:'').trim()})}
- if(!Object.values(cols).some(c=>c.server!==undefined))throw new Error('ไม่พบคอลัมน์ที่อยู่เซิร์ฟเวอร์ Scan – หัวคอลัมน์ในไฟล์: '+rows[0].slice(0,25).join(', '));
- return out}
-async function importBook(i,inp){const f=inp.files[0];inp.value='';if(!f)return;const p=S.printers[i];
- try{const entries=bookEntries(parseCsv(await f.text()));if(!entries.length)throw new Error('ไม่พบรายการ Scan ในไฟล์');
-  await post('/api/book?ip='+encodeURIComponent(p.ip),{entries});toast(`นำเข้า ${entries.length} รายการ Scan ของ ${p.name} แล้ว – กด Verify ที่ Host เพื่ออัปเดตชื่อ Scan`,6000);refresh()}
- catch(e){toast('นำเข้าไม่สำเร็จ: '+e.message,9000)}}
-async function clearBook(i){const p=S.printers[i];if(!confirm('ล้างสมุดที่อยู่ที่นำเข้าของ '+p.name+'?'))return;await post('/api/book?ip='+encodeURIComponent(p.ip),{entries:[]});refresh()}
-async function viewBook(i){const p=S.printers[i],r=await api('/api/book?ip='+encodeURIComponent(p.ip));
- dialog('สมุดที่อยู่ (Scan) – '+p.name,[],{},async()=>{},`<div class="sm" style="margin-bottom:6px">นำเข้าเมื่อ ${esc(r.date||'')} · ${r.entries.length} รายการ</div><div class="tw" style="max-height:60vh;overflow:auto"><table style="min-width:0">
-  <thead><tr><th>ชื่อ Scan (Nickname)</th><th>Server</th><th>Port</th><th>Protocol</th><th>Path</th></tr></thead><tbody>${r.entries.map(e=>`<tr><td><b>${esc(e.nick)}</b></td><td class="mono">${esc(e.server)}</td><td>${e.port||''}</td><td>${esc(e.proto)}</td><td class="mono">${esc(e.path)}</td></tr>`).join('')}</tbody></table></div>`)}
-
 // ---- Verify: ESP32 checks the PC (MAC / name / SMB 445) and every copier ----
 async function verifyHost(){const v={name:$('#f_name').value.trim(),mac:normMac($('#f_mac').value)||$('#f_mac').value.trim(),
   aliases:$('#f_aliases').value.trim(),fallback4:$('#f_fallback4').value.trim(),relayPort:Number($('#f_relayPort').value)||0};
  $('#verify').innerHTML='<div class="vl"><div class="vh running">กำลังเริ่มตรวจสอบ…</div></div>';
  try{await post('/api/verify',v)}catch(e){$('#verify').innerHTML=`<div class="vl"><div class="vh fail">${esc(e.message)}</div></div>`;return}
  for(let k=0;k<90;k++){await sleep(k?700:300);let r;try{r=await api('/api/verify')}catch(e){continue}
-  renderVerify(r);if(!r.running){applyScanName(r);break}}}
-// Every Verify refreshes "ชื่อ Scan" from the copiers' address books; a changed value gets a green frame.
-function applyScanName(r){const e=$('#f_scanName');if(!e||!r.scanChecked)return;const old=e.value.trim(),nv=r.scanName||'';
- const note=$('#scanNote');if(note)note.remove();e.value=nv;e.classList.toggle('chg',old!==nv);
- if(old!==nv){e.insertAdjacentHTML('afterend',`<div class="chgnote" id="scanNote">● ชื่อ Scan เปลี่ยนจากการ Verify: ${old?`"${esc(old)}"`:'(ว่าง)'} → ${nv?`"${esc(nv)}"`:'(ไม่พบในสมุดที่อยู่)'} – กด บันทึก เพื่อเก็บค่าใหม่</div>`);
-  e.oninput=()=>{e.classList.remove('chg');const n=$('#scanNote');if(n)n.remove()}}}
+  renderVerify(r);if(!r.running)break}}
 function renderVerify(r){const IC={ok:'✓',warn:'!',fail:'✕',skip:'–',wait:'',run:''};
  const head={running:'กำลังตรวจสอบ… (ESP32 ทดสอบจริงจากตัวอุปกรณ์)',ok:'✓ ผ่านทั้งหมด – พร้อมส่งไฟล์ Scan',warn:'ใช้งานได้ แต่มีข้อควรระวัง (ดูรายการสีส้ม)',fail:'พบปัญหา – ดูรายการสีแดงและวิธีแก้'}[r.result];
  $('#verify').innerHTML=`<div class="vl"><div class="vh ${r.result}">${head}</div>`+r.steps.map(s=>`<div class="vr"><span class="ic ${s.state}">${IC[s.state]||''}</span>

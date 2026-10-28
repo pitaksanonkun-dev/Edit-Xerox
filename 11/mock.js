@@ -156,31 +156,6 @@
       pending: sessions.length + 2, nextFlush: 180, timeValid: true };
   }
 
-  // ---- Copier address books (Scan destinations) -----------------------------
-  const books = {
-    '192.168.20.20': { date: ago(86400 * 2), entries: [
-      { nick: 'test', server: '192.168.20.10', port: 4451, proto: 'SMB', path: 'scan' },
-      { nick: 'บัญชี-สแกน', server: 'PC-ACC01', port: 445, proto: 'SMB', path: 'scan' },
-      { nick: 'IT-Notebook', server: 'nb-it05.company.local', port: 445, proto: 'SMB', path: 'scan' },
-      { nick: 'Store', server: '192.168.20.33', port: 445, proto: 'SMB', path: 'scan' }] },
-    '192.168.20.21': { date: ago(86400 * 5), entries: [
-      { nick: 'HR-Scan', server: '192.168.20.10', port: 4452, proto: 'SMB', path: 'hr' },
-      { nick: 'บัญชีชั้น3', server: '192.168.20.10', port: 4451, proto: 'SMB', path: 'scan' }] }
-  };
-  function bookMatch(name, aliases, ips, port) {
-    const names = [name, ...String(aliases || '').split(',')].map(s => s.trim().toLowerCase()).filter(Boolean);
-    const lbl = s => s.toLowerCase().replace(/^.*:\/\//, '').replace(/^[\\/]+/, '').split(/[\\/:]/)[0];
-    const fl = s => s.split('.')[0];
-    const out = [];
-    printers.forEach(p => (books[p.ip] ? books[p.ip].entries : []).forEach(e => {
-      const s = lbl(e.server);
-      const hit = /^\d+\.\d+\.\d+\.\d+$/.test(s) ? (s === cfg.net.ip ? port && e.port === port : ips.includes(s)) : names.some(n => s === n || fl(s) === fl(n));
-      const item = `${e.nick || e.server} (${p.name})`;
-      if (hit && !out.includes(item)) out.push(item);
-    }));
-    return out.join(', ');
-  }
-
   // ---- Verify simulation ----------------------------------------------------
   let vj = null;
   function verifyStatus() {
@@ -213,15 +188,9 @@
     add('relay', 'เครื่องถ่ายเอกสาร → ESP32 : พอร์ต Relay', 5200 + printers.length * 600, !port ? 'skip' : clash ? 'fail' : listening ? 'ok' : 'warn',
       !port ? 'ไม่ได้ใช้ Relay (ใช้โหมด DNS – Address Type = Host Name)' : clash ? `พอร์ต ${port} ถูกใช้โดย Host ${clash.name} แล้ว` :
       listening ? `เปิดรับอยู่ – ใน Xerox ใส่ IPv4 ${cfg.net.ip} Port ${port}` : `ยังไม่เปิด – จะเริ่มรับหลังกด บันทึก (Xerox ใส่ ${cfg.net.ip} Port ${port})`);
-    const anyBook = printers.some(p => books[p.ip] && books[p.ip].entries.length);
-    const scanName = anyBook ? bookMatch(vj.name, vj.aliases, [macIp, nameIp, target, vj.fallback4].filter(Boolean), port) : '';
-    add('scan', 'ชื่อ Scan ในสมุดที่อยู่ของเครื่องถ่ายเอกสาร', 5600 + printers.length * 600, !anyBook ? 'skip' : scanName ? 'ok' : 'warn',
-      !anyBook ? 'ยังไม่ได้นำเข้าสมุดที่อยู่ของเครื่องถ่ายเอกสาร (แท็บ เครื่องพิมพ์ Xerox → นำเข้าสมุดที่อยู่)' :
-      scanName ? 'พบ: ' + scanName : 'ไม่พบรายการ Scan ที่ชี้มาที่เครื่องนี้ในสมุดที่อยู่ที่นำเข้าไว้');
     const running = steps.some(s => s.state === 'run' || s.state === 'wait');
-    if (!running) { vj.scanChecked = anyBook; vj.scanName = scanName; }
     const result = running ? 'running' : steps.some(s => s.state === 'fail') ? 'fail' : steps.some(s => s.state === 'warn') ? 'warn' : 'ok';
-    return { running, started: true, steps, result, scanChecked: !running && vj.scanChecked, scanName: vj.scanName || '' };
+    return { running, started: true, steps, result };
   }
 
   // ---- Helpers mirroring the firmware -------------------------------------
@@ -280,7 +249,7 @@
   }
   function status() {
     return {
-      device: { fw: '1.2.1', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
+      device: { fw: '1.3.0', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
         ip: cfg.net.ip, mask: cfg.net.mask, gw: cfg.net.gw, dns: cfg.net.dns, dhcp: cfg.net.dhcp, uptime: uptime(),
         time: now(), heap: 182344 - sessions.length * 9000, interval: cfg.res.interval, onDemand: cfg.res.onDemand, maxRelay: MAX_RELAY },
       stats: Object.assign({}, stats),
@@ -291,7 +260,7 @@
         relayFails: h.relayFails, relayBytes: Math.round(h.relayBytes), relayLast: h.relayLast,
         status: !h.enabled ? 'disabled' : h.rounds === 0 ? 'pending' : h.fails === 0 ? 'online' : 'offline'
       })),
-      printers: printers.map(p => Object.assign({ bookCount: books[p.ip] ? books[p.ip].entries.length : 0, bookDate: books[p.ip] ? books[p.ip].date : '' }, p)),
+      printers: printers.map(p => Object.assign({}, p)),
       sessions: sessions.map(s => ({ client: s.client, host: s.host, target: s.target, port: s.port, bytes: Math.round(s.bytes),
         secs: Math.round((Date.now() - s.start) / 1000), state: s.state })),
       relays: relays.slice(0, 40), changes: changes.slice(0, 60), queries: queries.slice(0, 60)
@@ -318,14 +287,6 @@
         vj = { t0: Date.now(), name: String(body.name || '').trim(), aliases: body.aliases || '', mac: body.mac || '', fallback4: body.fallback4 || '', relayPort: body.relayPort || 0 };
         return ok();
       case 'GET /api/verify': return reply(verifyStatus());
-      case 'GET /api/book': return reply(books[u.searchParams.get('ip')] || { entries: [] });
-      case 'POST /api/book': {
-        const ip = u.searchParams.get('ip');
-        if (!printers.some(p => p.ip === ip)) return err('ไม่พบเครื่องพิมพ์ ' + ip);
-        if (!body.entries.length) delete books[ip];
-        else books[ip] = { date: now(), entries: body.entries.filter(e => String(e.server || '').trim()) };
-        return ok();
-      }
       case 'POST /api/scan': if (!scanStart) scanStart = Date.now(); return ok();
       case 'GET /api/test': {
         const i = matchHost(u.searchParams.get('name') || '');

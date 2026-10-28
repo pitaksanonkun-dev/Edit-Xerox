@@ -1,7 +1,6 @@
 #include "Verify.h"
 #include "AppState.h"
 #include "Discovery.h"
-#include "PrinterBook.h"
 #include "Relay.h"
 #include "Resolver.h"
 #include "Util.h"
@@ -21,13 +20,12 @@ struct Step { String key, label, state, detail; };   // state: wait | run | ok |
 static std::vector<Step> steps;
 
 enum Phase { P_IDLE, P_NET, P_MAC, P_MAC_CONFIRM, P_MAC_SCAN, P_NAME, P_NAME_WAIT, P_TARGET, P_SMB, P_SMB_WAIT,
-             P_PRN, P_PRN_WAIT, P_RELAY, P_SCAN, P_DONE };
+             P_PRN, P_PRN_WAIT, P_RELAY, P_DONE };
 static Phase    phase = P_IDLE;
 static uint32_t phaseMs = 0;
 static bool     sawScan = false;
 
-static String   vName, vAliases, scanResult;
-static bool     scanChecked = false;
+static String   vName, vAliases;
 static uint8_t  vMac[6];
 static bool     hasMac = false;
 static uint32_t vFallback = 0, macIp = 0, nameIp = 0, target = 0;
@@ -99,8 +97,6 @@ void verifyStart(const String& name, const String& aliases, const String& mac, c
   vName = name;
   vName.trim();
   vAliases = aliases;
-  scanResult = "";
-  scanChecked = false;
   hasMac = parseMac(mac, vMac) && macValid(vMac);
   vFallback = 0;
   parseIp4(fallback4, vFallback);
@@ -119,7 +115,6 @@ void verifyStart(const String& name, const String& aliases, const String& mac, c
     steps.push_back({"p" + String(i), "ESP32 → เครื่องถ่ายเอกสาร " + cfg.printers[i].name + " (" + cfg.printers[i].ip + ")", "wait", ""});
   if (cfg.printers.empty()) steps.push_back({"p", "ESP32 → เครื่องถ่ายเอกสาร", "wait", ""});
   steps.push_back({"relay", "เครื่องถ่ายเอกสาร → ESP32 : พอร์ต Relay", "wait", ""});
-  steps.push_back({"scan", "ชื่อ Scan ในสมุดที่อยู่ของเครื่องถ่ายเอกสาร", "wait", ""});
   go(P_NET);
 }
 
@@ -263,32 +258,17 @@ void verifyLoop() {
     }
 
     case P_RELAY: {
-      if (!vPort) { set("relay", "skip", "ไม่ได้ใช้ Relay (ใช้โหมด DNS – Address Type = Host Name)"); go(P_SCAN); return; }
+      if (!vPort) { set("relay", "skip", "ไม่ได้ใช้ Relay (ใช้โหมด DNS – Address Type = Host Name)"); go(P_DONE); return; }
       for (auto& h : cfg.hosts)
         if (h.relayPort == vPort && !h.name.equalsIgnoreCase(vName)) {
           set("relay", "fail", "พอร์ต " + String(vPort) + " ถูกใช้โดย Host " + h.name + " แล้ว");
-          go(P_SCAN);
+          go(P_DONE);
           return;
         }
       if (relayListening(vPort))
         set("relay", "ok", "เปิดรับอยู่ – ใน Xerox ใส่ IPv4 " + ip4Str(g_myIp) + " Port " + String(vPort));
       else
         set("relay", "warn", "ยังไม่เปิด – จะเริ่มรับหลังกด บันทึก (Xerox ใส่ " + ip4Str(g_myIp) + " Port " + String(vPort) + ")");
-      go(P_SCAN);
-      return;
-    }
-
-    case P_SCAN: {
-      if (!bookAny()) {
-        set("scan", "skip", "ยังไม่ได้นำเข้าสมุดที่อยู่ของเครื่องถ่ายเอกสาร (แท็บ เครื่องพิมพ์ Xerox → นำเข้าสมุดที่อยู่)");
-        go(P_DONE);
-        return;
-      }
-      std::vector<uint32_t> ips = {macIp, nameIp, target, vFallback};
-      scanResult = bookMatch(vName, vAliases, ips, vPort);
-      scanChecked = true;
-      if (scanResult.length()) set("scan", "ok", "พบ: " + scanResult);
-      else set("scan", "warn", "ไม่พบรายการ Scan ที่ชี้มาที่เครื่องนี้ในสมุดที่อยู่ที่นำเข้าไว้");
       go(P_DONE);
       return;
     }
@@ -310,6 +290,4 @@ void verifyJson(JsonDocument& doc) {
     if (s.state == "warn") warns++;
   }
   doc["result"] = verifyRunning() ? "running" : fails ? "fail" : warns ? "warn" : "ok";
-  doc["scanChecked"] = scanChecked;          // true = the address books were compared
-  doc["scanName"] = scanResult;
 }

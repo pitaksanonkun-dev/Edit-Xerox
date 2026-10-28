@@ -5,7 +5,7 @@
 #include <Arduino.h>
 #include <vector>
 
-#define FW_VERSION      "1.2.1"
+#define FW_VERSION      "1.3.0"
 #define MAX_HOSTS       64
 #define MAX_PRINTERS    32
 #define MAX_V6          4
@@ -128,8 +128,6 @@ struct PrinterState {
   uint32_t lastCheckMs = 0;
   uint32_t dnsQueries  = 0;
   String   lastQuery, lastQueryTime;
-  uint16_t bookCount = 0;          // scan destinations imported from the copier's address book
-  String   bookDate;
 };
 
 extern AppConfig                 cfg;

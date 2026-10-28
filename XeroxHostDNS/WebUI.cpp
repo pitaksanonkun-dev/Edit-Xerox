@@ -5,7 +5,6 @@
 #include "Discovery.h"
 #include "HostDns.h"
 #include "LogStore.h"
-#include "PrinterBook.h"
 #include "PrinterMon.h"
 #include "Relay.h"
 #include "Resolver.h"
@@ -118,7 +117,6 @@ static void handleStatus() {
     o["name"] = c.name; o["ip"] = c.ip; o["model"] = c.model; o["location"] = c.location; o["note"] = c.note;
     o["online"] = p.online; o["checked"] = p.checked;
     o["dnsQueries"] = p.dnsQueries; o["lastQuery"] = p.lastQuery; o["lastQueryTime"] = p.lastQueryTime;
-    o["bookCount"] = p.bookCount; o["bookDate"] = p.bookDate;
   }
 
   JsonArray cl = d["changes"].to<JsonArray>();
@@ -182,29 +180,7 @@ static void handleSavePrinters() {
   printerMonReset();
   setPrinters(list);
   configSave();
-  bookCleanup();                           // books of removed printers / changed IPs
-  bookLoadMeta();
   sendOk();
-}
-
-// Address book of one copier: entries parsed in the browser from the Xerox CSV export.
-static void handleBookSave() {
-  if (!auth()) return;
-  JsonDocument doc;
-  if (!parseBody(doc)) return;
-  String ip = server.arg("ip");
-  if (!doc["entries"].is<JsonArray>()) { sendErr("ข้อมูลไม่ถูกต้อง"); return; }
-  if (doc["entries"].size() == 0) { bookDelete(ip); sendOk(); return; }
-  String err = bookSave(ip, doc["entries"].as<JsonArrayConst>());
-  if (err.length()) { sendErr(err); return; }
-  sendOk();
-}
-
-static void handleBookGet() {
-  if (!auth()) return;
-  JsonDocument d;
-  bookJson(server.arg("ip"), d);
-  sendJson(d);
 }
 
 static void handleSaveSettings() {
@@ -283,7 +259,6 @@ static void handleFactory() {
   if (!auth()) return;
   factoryReset();
   logStoreClear();
-  for (auto& p : cfg.printers) bookDelete(p.ip);
   sendOk(true);
   rebootAt = millis() + 800;
 }
@@ -393,8 +368,6 @@ void webBegin() {
   server.on("/api/test", HTTP_GET, handleTest);
   server.on("/api/neighbors", HTTP_GET, handleNeighbors);
   server.on("/api/scan", HTTP_POST, handleScan);
-  server.on("/api/book", HTTP_POST, handleBookSave);
-  server.on("/api/book", HTTP_GET, handleBookGet);
   server.on("/api/verify", HTTP_POST, handleVerifyStart);
   server.on("/api/verify", HTTP_GET, handleVerifyStatus);
   server.onNotFound([]() { server.send(404, "text/plain", "Not found"); });
