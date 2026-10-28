@@ -5,7 +5,7 @@
 #include <Arduino.h>
 #include <vector>
 
-#define FW_VERSION      "1.6.0"
+#define FW_VERSION      "1.6.1"
 #define MAX_HOSTS       100
 #define MAX_PRINTERS    32
 #define MAX_V6          4
@@ -21,7 +21,6 @@ struct NetCfg {
   bool   dhcp = true;
   String ip, mask, gw, dns;
   bool   autoFallback = true;          // static IP does not fit the network (moved) -> DHCP until reboot
-  bool   conflictFallback = false;     // another device uses our static IP -> DHCP (off: keep the IP, only warn)
   String hostname = "xerox-dns";
 };
 

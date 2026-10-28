@@ -136,7 +136,6 @@ void configToJson(JsonDocument& doc, bool withSecrets) {
   n["dhcp"] = cfg.net.dhcp; n["ip"] = cfg.net.ip; n["mask"] = cfg.net.mask;
   n["gw"] = cfg.net.gw; n["dns"] = cfg.net.dns; n["hostname"] = cfg.net.hostname;
   n["autoFallback"] = cfg.net.autoFallback;
-  n["conflictFallback"] = cfg.net.conflictFallback;
 
   JsonObject d = doc["dns"].to<JsonObject>();
   d["upstream1"] = cfg.dns.upstream1; d["upstream2"] = cfg.dns.upstream2;
@@ -181,7 +180,6 @@ void configFromJson(JsonVariantConst d) {
   JsonVariantConst n = d["net"];
   cfg.net.dhcp     = jbool(n["dhcp"], cfg.net.dhcp);
   cfg.net.autoFallback = jbool(n["autoFallback"], cfg.net.autoFallback);
-  cfg.net.conflictFallback = jbool(n["conflictFallback"], cfg.net.conflictFallback);
   cfg.net.ip       = jstr(n["ip"], cfg.net.ip);
   cfg.net.mask     = jstr(n["mask"], cfg.net.mask);
   cfg.net.gw       = jstr(n["gw"], cfg.net.gw);

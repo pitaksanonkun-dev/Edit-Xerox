@@ -15,7 +15,7 @@
   const MAX_HOSTS = 100, MAX_PRINTERS = 32, MAX_RELAY = 100, MAX_SESSIONS = 3;
 
   const cfg = {
-    net: { dhcp: false, ip: '192.168.20.10', mask: '255.255.255.0', gw: '192.168.20.1', dns: '192.168.20.5', hostname: 'xerox-dns', autoFallback: true, conflictFallback: false },
+    net: { dhcp: false, ip: '192.168.20.10', mask: '255.255.255.0', gw: '192.168.20.1', dns: '192.168.20.5', hostname: 'xerox-dns', autoFallback: true },
     dns: { upstream1: '192.168.20.5', upstream2: '8.8.8.8', ttl: 30, domain: 'company.local', anySuffix: true, answerAAAA: true, restrict: false },
     res: { onDemand: true, interval: 1800, timeoutMs: 800, nbns: true, llmnr: true, mdns: true, passive: true, extraBcast: '', scanSubnets: '192.168.30.0/24', dnsLookup: false },
     time: { tz: '<+07>-7', ntp: 'pool.ntp.org' },
@@ -249,9 +249,9 @@
   }
   function status() {
     return {
-      device: { fw: '1.6.0', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
+      device: { fw: '1.6.1', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
         ip: cfg.net.ip, mask: cfg.net.mask, gw: cfg.net.gw, dns: cfg.net.dns, dhcp: cfg.net.dhcp, uptime: uptime(),
-        time: now(), heap: 182344 - sessions.length * 9000, interval: cfg.res.interval, onDemand: cfg.res.onDemand, maxRelay: MAX_RELAY, user: cfg.auth.user, netFallback: false, netReason: '', ipConflict: '' },
+        time: now(), heap: 182344 - sessions.length * 9000, interval: cfg.res.interval, onDemand: cfg.res.onDemand, maxRelay: MAX_RELAY, user: cfg.auth.user, netFallback: false, netReason: '' },
       stats: Object.assign({}, stats),
       hosts: hosts.map(h => ({
         name: h.name, scanName: h.scanName || '', mac: h.mac, aliases: h.aliases, fallback4: h.fallback4, fallback6: h.fallback6, note: h.note, enabled: h.enabled,

@@ -184,7 +184,6 @@ static void handleStatus() {
   dev["dhcp"] = cfg.net.dhcp;
   dev["netFallback"] = netGuardFallback();
   dev["netReason"] = netGuardReason();
-  dev["ipConflict"] = netGuardConflict();
   dev["uptime"] = uptimeStr();
   dev["time"] = timeValid() ? nowStr() : String("");
   dev["heap"] = ESP.getFreeHeap();
