@@ -1,0 +1,6 @@
+DisplayName,FirstName,LastName,Company,E-mailAddress,ScanNickName,ScanTransferProtocol,ScanServerAddress,ScanServerPort,ScanDocumentPath,ScanLoginName
+Accounting,,,,acc@company.local,บัญชี-สแกน,SMB,PC-ACC01,445,scan,scan
+HR Department,,,,hr@company.local,HR-Scan,SMB,192.168.20.10,4452,hr,scan
+Test,,,,,test,SMB,192.168.20.10,4451,scan,scan
+Purchasing,,,,,Purchase,SMB,PC-PURCHASE.company.local,445,scan,scan
+Store,,,,,Store,SMB,192.168.20.33,445,scan,scan
