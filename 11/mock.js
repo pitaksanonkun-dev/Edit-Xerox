@@ -249,9 +249,9 @@
   }
   function status() {
     return {
-      device: { fw: '1.4.0', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
+      device: { fw: '1.5.0', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
         ip: cfg.net.ip, mask: cfg.net.mask, gw: cfg.net.gw, dns: cfg.net.dns, dhcp: cfg.net.dhcp, uptime: uptime(),
-        time: now(), heap: 182344 - sessions.length * 9000, interval: cfg.res.interval, onDemand: cfg.res.onDemand, maxRelay: MAX_RELAY },
+        time: now(), heap: 182344 - sessions.length * 9000, interval: cfg.res.interval, onDemand: cfg.res.onDemand, maxRelay: MAX_RELAY, user: cfg.auth.user },
       stats: Object.assign({}, stats),
       hosts: hosts.map(h => ({
         name: h.name, scanName: h.scanName || '', mac: h.mac, aliases: h.aliases, fallback4: h.fallback4, fallback6: h.fallback6, note: h.note, enabled: h.enabled,
@@ -280,6 +280,14 @@
     const body = opt && opt.body ? JSON.parse(opt.body) : null;
     switch (method + ' ' + u.pathname) {
       case 'GET /api/status': return reply(status());
+      case 'POST /api/login': return ok();
+      case 'POST /api/logout': alert('ออกจากระบบแล้ว (ตัวอย่าง) – บนบอร์ดจริงจะกลับไปหน้าเข้าสู่ระบบ'); return ok();
+      case 'POST /api/password': {
+        if (body.old !== cfg.auth.pass) return err('รหัสผ่านปัจจุบันไม่ถูกต้อง');
+        if (!String(body.user || '').trim()) return err('ชื่อผู้ใช้ต้องมี 1–32 ตัวอักษร');
+        if (String(body.pass || '').length < 6) return err('รหัสผ่านใหม่ต้องมี 6–64 ตัวอักษร');
+        cfg.auth.user = body.user.trim(); cfg.auth.pass = body.pass; return ok();
+      }
       case 'GET /api/config': { const c = clone(cfg); delete c.auth.pass; return reply(c); }
       case 'GET /api/neighbors': return reply(neighbors());
       case 'POST /api/verify':
@@ -317,15 +325,13 @@
           if (p < 22 || p > 30) return err('Subnet ต้องเป็น /22 ถึง /30: ' + s);
         }
         const oldNet = JSON.stringify(cfg.net) + cfg.time.tz + cfg.time.ntp;
-        const pass = body.auth && body.auth.pass;
-        if (body.auth) delete body.auth.pass;
+        delete body.auth;
         if (body.log) {
           const c = (v, lo, hi) => Math.min(hi, Math.max(lo, Number(v) || lo));
           body.log = { changeDays: c(body.log.changeDays, 1, 365), relayDays: c(body.log.relayDays, 1, 365), queryDays: c(body.log.queryDays, 1, 30),
             maxKB: c(body.log.maxKB, 64, 800), flushMin: c(body.log.flushMin, 1, 60), queryPersist: !!body.log.queryPersist };
         }
-        for (const g of ['net', 'dns', 'res', 'time', 'auth', 'log']) Object.assign(cfg[g], body[g]);
-        if (pass) cfg.auth.pass = pass;
+        for (const g of ['net', 'dns', 'res', 'time', 'log']) Object.assign(cfg[g], body[g]);
         return ok(oldNet !== JSON.stringify(cfg.net) + cfg.time.tz + cfg.time.ntp);
       }
       case 'POST /api/resolve': {

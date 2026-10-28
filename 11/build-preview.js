@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const src = fs.readFileSync(path.join(__dirname, '..', 'XeroxHostDNS', 'WebPage.h'), 'utf8');
-const html = src.split('R"rawliteral(')[1].split(')rawliteral"')[0];
+const html = src.split('INDEX_HTML[] PROGMEM = R"rawliteral(')[1].split(')rawliteral"')[0];
 const mock = fs.readFileSync(path.join(__dirname, 'mock.js'), 'utf8');
 
 const banner =

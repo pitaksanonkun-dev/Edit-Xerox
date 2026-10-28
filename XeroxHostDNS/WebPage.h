@@ -1,6 +1,32 @@
 #pragma once
 #include <Arduino.h>
 
+// Login page, served on "/" until the browser has a session cookie.
+static const char LOGIN_HTML[] PROGMEM = R"rawliteral(<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Xerox Host DNS – เข้าสู่ระบบ</title>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;
+ font-family:system-ui,"Segoe UI",Tahoma,sans-serif;background:#f4f6f9;color:#1d2433;font-size:14px}
+.box{background:#fff;border:1px solid #e2e6ee;border-radius:10px;width:min(360px,100%);overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,.08)}
+.top{background:#14213d;color:#fff;padding:16px 20px}.top h1{font-size:17px;margin:0;font-weight:600}.top div{font-size:12px;opacity:.8;margin-top:3px}
+form{padding:18px 20px 20px}label{display:block;font-size:12px;color:#6b7385;margin:10px 0 4px}
+input{width:100%;padding:9px 10px;border:1px solid #e2e6ee;border-radius:6px;font-size:14px}
+button{width:100%;margin-top:16px;padding:10px;border:0;border-radius:6px;background:#0b62d6;color:#fff;font-size:14px;font-weight:600;cursor:pointer}
+button:disabled{opacity:.6}#err{color:#c62828;font-size:13px;margin-top:10px;min-height:18px}
+</style></head><body>
+<div class="box"><div class="top"><h1>Xerox Host DNS Bridge</h1><div>เข้าสู่ระบบผู้ดูแล (Admin)</div></div>
+<form id="f"><label>ชื่อผู้ใช้</label><input id="u" autocomplete="username" required autofocus>
+<label>รหัสผ่าน</label><input id="p" type="password" autocomplete="current-password" required>
+<button id="b">เข้าสู่ระบบ</button><div id="err"></div></form></div>
+<script>
+const g=i=>document.getElementById(i);
+g('f').onsubmit=async e=>{e.preventDefault();g('b').disabled=true;g('err').textContent='';
+ try{const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user:g('u').value,pass:g('p').value})});
+  const j=await r.json().catch(()=>({}));if(r.ok&&j.ok)location.reload();else{g('err').textContent=j.error||('HTTP '+r.status);g('p').select()}}
+ catch(x){g('err').textContent='เชื่อมต่อไม่ได้: '+x.message}g('b').disabled=false}
+</script></body></html>)rawliteral";
+
 // Single-page web UI (Thai). Talks to the JSON API in WebUI.cpp.
 static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
 <html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -40,9 +66,17 @@ dialog form{padding:16px 18px;max-height:90vh;overflow:auto}
 .vr .d{color:var(--mut);font-size:12px;margin-top:2px}dialog h3{margin:0 0 6px;font-size:16px}.dbtn{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
 #toast{position:fixed;right:16px;bottom:16px;background:#14213d;color:#fff;padding:10px 14px;border-radius:8px;display:none;max-width:90vw}
 .sm{font-size:12px;color:var(--mut)}.pick{margin-top:10px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fafbfc}
+.acct{margin-left:auto;position:relative}.acct>button{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:13px}
+.menu{position:absolute;right:0;top:calc(100% + 6px);background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);min-width:190px;z-index:5;display:none;overflow:hidden}
+.menu.on{display:block}.menu button{display:block;width:100%;text-align:left;border:0;background:none;padding:10px 14px;font-size:13px;cursor:pointer;color:var(--fg)}.menu button:hover{background:#f1f4f9}
+.menu .who{padding:9px 14px;font-size:12px;color:var(--mut);border-bottom:1px solid var(--line)}
+.imp td{padding:4px 5px}.imp input[type=text]{padding:4px 6px;font-size:13px;min-width:90px}.imp tr.off td{opacity:.45}
 .pick table{min-width:0}.pick .tw{max-height:260px;overflow:auto}.pick td,.pick th{padding:5px 6px}ol{margin:6px 0 0 18px;padding:0}li{margin:3px 0}
 </style></head><body>
-<header><h1>Xerox Host DNS Bridge</h1><span class="meta" id="hdr">กำลังโหลด…</span></header>
+<header><h1>Xerox Host DNS Bridge</h1><span class="meta" id="hdr">กำลังโหลด…</span>
+<div class="acct"><button type="button" onclick="$('#menu').classList.toggle('on')">👤 <span id="acctName">admin</span> ▾</button>
+<div class="menu" id="menu"><div class="who">เข้าสู่ระบบเป็น <b id="acctWho">admin</b></div>
+<button type="button" onclick="changePass()">🔑 เปลี่ยนรหัสผ่าน</button><button type="button" onclick="logout()">⎋ ออกจากระบบ</button></div></div></header>
 <nav id="nav">
 <button data-t="dash" class="on">ภาพรวม</button><button data-t="hosts">เครื่องปลายทาง Scan</button>
 <button data-t="printers">เครื่องพิมพ์ Xerox</button><button data-t="logs">บันทึก (Log)</button><button data-t="set">ตั้งค่า</button>
@@ -61,7 +95,9 @@ dialog form{padding:16px 18px;max-height:90vh;overflow:auto}
 
 <section class="tab" id="t-hosts">
  <div class="card"><h2>รายการ Scan ปลายทาง (อ้างอิงชื่อ Scan ในเครื่อง Xerox)</h2>
- <div class="bar"><button class="btn p" onclick="editHost(-1)">+ เพิ่ม Host</button><button class="btn" onclick="resolveAll()">ค้นหา IP ใหม่ทั้งหมด</button>
+ <div class="bar"><button class="btn p" onclick="editHost(-1)">+ เพิ่ม Host</button>
+ <label class="btn" style="margin:0;color:inherit">📄 เพิ่ม Host จากไฟล์ CSV<input type="file" accept=".csv,text/csv" style="display:none" onchange="importCsv(this)"></label>
+ <button class="btn" onclick="resolveAll()">ค้นหา IP ใหม่ทั้งหมด</button>
  <span class="sm" id="intv"></span></div>
  <div class="tw"><table><thead><tr><th>ชื่อ Scan (ใน Xerox)</th><th>สถานะ</th><th>IPv4</th><th>IPv6</th><th>พบโดย</th><th>พบล่าสุด</th><th>Relay (กรอกใน Xerox)</th><th>DNS</th><th></th></tr></thead><tbody id="hostRows"></tbody></table></div></div>
 </section>
@@ -131,9 +167,9 @@ dialog form{padding:16px 18px;max-height:90vh;overflow:auto}
   <div class="hint">ส่งคำถามแบบ unicast ไปทุก IP ในวงนั้นทุกรอบ (/22–/30) – Firewall ของ PC ต้องอนุญาต UDP 137 จากวงของ ESP32</div>
   <div class="chk"><input type="checkbox" id="s_dnsLookup"><span>ถาม DNS ของบริษัท (Active Directory) ด้วยชื่อ Host + Domain suffix ด้านบน</span></div>
   <div class="hint">เหมาะกับเครื่องที่ join domain และลงทะเบียน DNS อัตโนมัติ ต้องกรอก Upstream DNS เป็น DNS ของ AD และ Domain suffix</div></div>
- <div class="card"><h2>เวลา และผู้ดูแล</h2><div class="f2">
-  <div><label>Time zone (POSIX)</label><input type="text" id="s_tz"></div><div><label>NTP Server</label><input type="text" id="s_ntp"></div>
-  <div><label>ชื่อผู้ใช้</label><input type="text" id="s_user"></div><div><label>รหัสผ่านใหม่ (เว้นว่าง = ไม่เปลี่ยน)</label><input type="password" id="s_pass" autocomplete="new-password"></div></div></div>
+ <div class="card"><h2>เวลา</h2><div class="f2">
+  <div><label>Time zone (POSIX)</label><input type="text" id="s_tz"></div><div><label>NTP Server</label><input type="text" id="s_ntp"></div></div>
+  <div class="hint">เปลี่ยนชื่อผู้ใช้ / รหัสผ่านผู้ดูแลที่เมนู 👤 มุมขวาบน → เปลี่ยนรหัสผ่าน</div></div>
  <div class="bar"><button class="btn p" type="submit">บันทึกการตั้งค่า</button></div>
 </form>
  <div class="card"><h2>สำรอง / กู้คืน / ระบบ</h2><div class="bar">
@@ -151,7 +187,8 @@ dialog form{padding:16px 18px;max-height:90vh;overflow:auto}
 const $=s=>document.querySelector(s);let S=null,C=null;
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function toast(m,ms){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',ms||3500)}
-async function api(p,o){const r=await fetch(p,o);const j=await r.json().catch(()=>({}));if(!r.ok||j.ok===false)throw new Error(j.error||('HTTP '+r.status));return j}
+async function api(p,o){const r=await fetch(p,o);const j=await r.json().catch(()=>({}));if(r.status===401&&j.login){location.reload();throw new Error(j.error)}
+ if(!r.ok||j.ok===false)throw new Error(j.error||('HTTP '+r.status));return j}
 const post=(p,b)=>api(p,{method:'POST',headers:{'Content-Type':'application/json'},body:b===undefined?'{}':JSON.stringify(b)});
 document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('on',x===b));
  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.id==='t-'+b.dataset.t));if(b.dataset.t==='set')loadSettings();if(b.dataset.t==='logs')loadLogTab()});
@@ -161,7 +198,7 @@ function fmtB(b){b=Number(b)||0;return b<1024?b+' B':b<1048576?(b/1024).toFixed(
 function ago(s){if(s<0)return'';if(s<60)return s+' วินาทีก่อน';if(s<3600)return Math.floor(s/60)+' นาทีก่อน';if(s<86400)return Math.floor(s/3600)+' ชม.ก่อน';return Math.floor(s/86400)+' วันก่อน'}
 
 async function refresh(){try{S=await api('/api/status');render()}catch(e){$('#hdr').textContent='เชื่อมต่อไม่ได้: '+e.message}}
-function render(){const d=S.device,st=S.stats;
+function render(){const d=S.device,st=S.stats;$('#acctName').textContent=$('#acctWho').textContent=d.user||'admin';
  $('#intv').textContent=(d.onDemand?'ค้นหา IP เมื่อ Xerox ส่งงาน · ตรวจเบื้องหลังทุก ':'ตรวจหา IP อัตโนมัติทุก ')+fmtIntv(d.interval)+' · รับฟังการประกาศชื่อจาก PC ตลอดเวลา';
  $('#hdr').textContent=`IP ${d.ip||'-'} · ${d.link?'Link '+d.speed+'Mbps':'สายแลนไม่เชื่อมต่อ'} · ${d.time||'uptime '+d.uptime} · v${d.fw}`;
  $('#dnsNote').innerHTML=`<b>โหมด Relay (แนะนำ):</b> ใน Xerox เลือก Address Type = <b>IPv4 Address</b> ใส่ IP <b class="ip">${esc(d.ip)}</b> และ Port ตามคอลัมน์ "Relay" ของแต่ละ Host<br>`+
@@ -206,7 +243,7 @@ function render(){const d=S.device,st=S.stats;
   `เพิ่มเครื่องพิมพ์ในหน้านี้เพื่อดูว่าเครื่องเริ่มถาม DNS แล้วหรือยัง (คอลัมน์ DNS Query)`].map(x=>`<li>${x}</li>`).join('');
 }
 
-function dialog(title,fields,vals,onOk,extra){$('#dlgTitle').textContent=title;
+function dialog(title,fields,vals,onOk,extra){$('#dlgTitle').textContent=title;$('#dlg').style.width='';$('#dlgOk').textContent='บันทึก';
  $('#dlgBody').innerHTML=(extra||'')+fields.map(f=>f.t==='chk'?`<div class="chk"><input type="checkbox" id="f_${f.k}" ${vals[f.k]!==false?'checked':''}><span>${f.l}</span></div>`
   :`<label>${f.l}${f.req?' *':''}</label><input type="text" id="f_${f.k}" value="${esc(vals[f.k]||f.def||'')}" ${f.req?'required':''} placeholder="${esc(f.ph||'')}">${f.h?`<div class="hint">${f.h}</div>`:''}`).join('');
  const d=$('#dlg');d.onclose=async()=>{if(d.returnValue!=='ok')return;const o={};fields.forEach(f=>{const e=$('#f_'+f.k);o[f.k]=f.t==='chk'?e.checked:e.value.trim()});
@@ -325,7 +362,7 @@ async function testName(){const n=$('#testName').value.trim();if(!n)return;const
  $('#testOut').innerHTML=r.match?`ตรงกับ Host <b>${esc(r.match)}</b> → IPv4 <b class="mono">${esc(r.ipv4||'ยังไม่ทราบ')}</b> (${r.status==='online'?'ออนไลน์':'ยังไม่พบในรอบล่าสุด'})`:'ไม่ตรงกับ Host ใดในรายการ — คำถามนี้จะถูกส่งต่อไปยัง Upstream DNS'}
 
 const SF={net:['dhcp','ip','mask','gw','dns','hostname'],dns:['upstream1','upstream2','ttl','domain','anySuffix','answerAAAA','restrict'],
- res:['onDemand','interval','timeoutMs','extraBcast','nbns','llmnr','mdns','passive','scanSubnets','dnsLookup'],time:['tz','ntp'],auth:['user','pass']};
+ res:['onDemand','interval','timeoutMs','extraBcast','nbns','llmnr','mdns','passive','scanSubnets','dnsLookup'],time:['tz','ntp']};
 async function loadSettings(){try{C=await api('/api/config')}catch(e){toast(e.message);return}
  for(const g in SF)SF[g].forEach(k=>{const e=$('#s_'+k);if(!e)return;const v=C[g]?.[k];if(e.type==='checkbox')e.checked=!!v;else e.value=v??''});togDhcp()}
 // Switching DHCP off fills Mask / Gateway / DNS with what DHCP gave the ESP32 right now; the IP is left to the user.
@@ -346,10 +383,99 @@ async function saveSettings(ev){ev.preventDefault();const b={};
    dns&&!isIp(dns)?'DNS ไม่ถูกต้อง':dns===ip?'DNS ของ ESP32 ห้ามเป็น IP ของ ESP32 เอง (จะถามวนกลับมาที่ตัวเอง)':'';
   if(bad){toast(bad,6000);$('#s_ip').focus();return}}
  for(const g in SF){b[g]={};SF[g].forEach(k=>{const e=$('#s_'+k);b[g][k]=e.type==='checkbox'?e.checked:e.type==='number'?Number(e.value):e.value.trim()})}
- try{const r=await post('/api/settings',b);$('#s_pass').value='';
+ try{const r=await post('/api/settings',b);
   if(r.reboot){if(confirm('บันทึกแล้ว ต้องรีบูตเพื่อใช้ค่าเครือข่าย/เวลาใหม่ รีบูตเลยหรือไม่?'))reboot(true)}else toast('บันทึกการตั้งค่าแล้ว')}catch(e){toast('ผิดพลาด: '+e.message,6000)}}
 async function reboot(nc){if(!nc&&!confirm('รีบูตอุปกรณ์?'))return;await post('/api/reboot');toast('กำลังรีบูต… รอสักครู่แล้วรีเฟรชหน้า (ถ้าเปลี่ยน IP ให้เปิดด้วย IP ใหม่)',10000)}
 async function factory(){if(!confirm('คืนค่าโรงงาน? รายการ Host/เครื่องพิมพ์และการตั้งค่าทั้งหมดจะถูกลบ'))return;await post('/api/factory');toast('กำลังคืนค่าโรงงานและรีบูต…',10000)}
 async function restore(inp){const f=inp.files[0];if(!f)return;try{const j=JSON.parse(await f.text());await post('/api/restore',j);toast('กู้คืนแล้ว กำลังรีบูต…',10000)}catch(e){toast('กู้คืนไม่สำเร็จ: '+e.message,6000)}inp.value=''}
+// Dialog with its own content: onOk runs on the OK button and the dialog stays open if it throws.
+function customDialog(title,width,okText,html,onOk,errId){const d=$('#dlg');$('#dlgTitle').textContent=title;d.style.width=width;$('#dlgOk').textContent=okText;
+ $('#dlgBody').innerHTML=html;d.onclose=()=>{$('#dlgOk').onclick=null};d.returnValue='';d.showModal();
+ $('#dlgOk').onclick=async ev=>{ev.preventDefault();$('#'+errId).textContent='';try{const m=await onOk();d.close();if(m)toast(m);refresh()}catch(e){$('#'+errId).textContent=e.message}}}
+
+// ---- Admin account ----
+document.addEventListener('click',e=>{if(!e.target.closest('.acct'))$('#menu').classList.remove('on')});
+async function logout(){try{await post('/api/logout')}catch(e){}location.reload()}
+function changePass(){$('#menu').classList.remove('on');
+ customDialog('เปลี่ยนรหัสผ่านผู้ดูแล','min(440px,94vw)','บันทึก',`<label>ชื่อผู้ใช้</label><input type="text" id="pw_user" value="${esc(S.device.user||'admin')}" autocomplete="username">
+  <label>รหัสผ่านปัจจุบัน *</label><input type="password" id="pw_old" autocomplete="current-password">
+  <label>รหัสผ่านใหม่ * (อย่างน้อย 6 ตัวอักษร)</label><input type="password" id="pw_new" autocomplete="new-password">
+  <label>ยืนยันรหัสผ่านใหม่ *</label><input type="password" id="pw_new2" autocomplete="new-password">
+  <div class="hint">หลังเปลี่ยน เครื่องอื่นที่ล็อกอินค้างไว้จะต้องล็อกอินใหม่ · โปรแกรม ESP32Finder ใช้รหัสใหม่นี้ด้วย · ถ้าลืมรหัส ต้องคืนค่าโรงงาน (CFG→GND ตอนเปิดเครื่อง) ซึ่งจะกลับเป็น admin / admin และลบรายการทั้งหมด</div>
+  <div id="pwErr" class="hint" style="color:var(--bad)"></div>`,
+  async()=>{const u=$('#pw_user').value.trim(),o=$('#pw_old').value,n=$('#pw_new').value;
+   const bad=!u?'กรุณากรอกชื่อผู้ใช้':!o?'กรุณากรอกรหัสผ่านปัจจุบัน':n.length<6?'รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร':n!==$('#pw_new2').value?'ยืนยันรหัสผ่านใหม่ไม่ตรงกัน':'';
+   if(bad)throw new Error(bad);await post('/api/password',{user:u,old:o,pass:n});return 'เปลี่ยนรหัสผ่านแล้ว'},'pwErr');
+ $('#pw_old').focus()}
+
+// ---- Add hosts from a Xerox address book export (.csv) ----
+// Columns used: ScanNickName / DisplayName, ScanServerAddress, ScanServerPort, ScanSMBShare, ScanLoginName.
+// An entry pointing at this ESP32 is a relay entry (its port is the relay port); an entry with a
+// host name is a PC addressed by name; any other IP becomes the host's fallback IPv4.
+function parseCsv(t){const rows=[];let row=[],f='',q=false;
+ const end=()=>{row.push(f);f='';if(row.some(x=>x.trim()!==''))rows.push(row);row=[]};
+ for(let i=0;i<t.length;i++){const c=t[i];
+  if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++}else q=false}else f+=c}
+  else if(c==='"')q=true;else if(c===','){row.push(f);f=''}
+  else if(c==='\n'||c==='\r'){if(c==='\r'&&t[i+1]==='\n')i++;end()}
+  else f+=c}
+ end();return rows}
+function decodeCsv(buf){const b=new Uint8Array(buf);
+ if(b[0]===0xFF&&b[1]===0xFE)return new TextDecoder('utf-16le').decode(buf);
+ if(b[0]===0xFE&&b[1]===0xFF)return new TextDecoder('utf-16be').decode(buf);
+ try{return new TextDecoder('utf-8',{fatal:true}).decode(buf).replace(/^﻿/,'')}catch(e){return new TextDecoder('windows-874').decode(buf)}}
+function mergeScan(old,add){const a=String(old||'').split(',').map(x=>x.trim()).filter(Boolean);
+ String(add||'').split(',').map(x=>x.trim()).filter(Boolean).forEach(x=>{if(!a.some(y=>y.toLowerCase()===x.toLowerCase()))a.push(x)});return a.join(', ')}
+let IMP=[];
+async function importCsv(inp){const f=inp.files[0];inp.value='';if(!f)return;
+ try{const rows=parseCsv(decodeCsv(await f.arrayBuffer()));
+  const H=rows.length?rows[0].map(h=>h.trim().toLowerCase()):[];
+  if(!H.includes('scanserveraddress'))throw new Error('ไม่ใช่ไฟล์ Address Book ของ Xerox (ไม่มีคอลัมน์ ScanServerAddress)');
+  const col=(r,...n)=>{for(const k of n){const i=H.indexOf(k.toLowerCase());if(i>=0&&(r[i]||'').trim())return r[i].trim()}return''};
+  const my=S.device.ip,byKey=new Map();IMP=[];
+  for(const r of rows.slice(1)){const addr=col(r,'ScanServerAddress');if(!addr)continue;
+   const nick=col(r,'ScanNickName','DisplayName','FirstName')||addr,port=Number(col(r,'ScanServerPort'))||445,ip=isIp(addr),relay=addr===my?port:0;
+   const ex=relay?S.hosts.findIndex(h=>h.relayPort===relay):ip?S.hosts.findIndex(h=>h.fallback4===addr||h.ipv4===addr):S.hosts.findIndex(h=>h.name.toLowerCase()===addr.toLowerCase());
+   const info={nick,display:col(r,'DisplayName'),share:col(r,'ScanSMBShare'),login:col(r,'ScanLoginName'),addr:addr+':'+port};
+   const key=ex>=0?'h'+ex:relay?'p'+relay:addr.toLowerCase();
+   if(byKey.has(key)){byKey.get(key).src.push(info);continue}
+   const e={ex,relay,src:[info],on:true,name:ex>=0?S.hosts[ex].name:cleanName(ip?nick:addr),nameSure:ex>=0||!ip,
+    mac:ex>=0?S.hosts[ex].mac:'',fallback4:ip&&!relay?addr:'',port:relay||(ex>=0?S.hosts[ex].relayPort:0)||''};
+   byKey.set(key,e);IMP.push(e)}
+  if(!IMP.length)throw new Error('ไม่พบรายการ Scan ที่มี ScanServerAddress');
+  IMP.forEach(e=>{e.scan=e.src.map(x=>x.nick).filter((v,i,a)=>a.indexOf(v)===i).join(', ');
+   if(e.ex>=0){const h=S.hosts[e.ex];e.same=mergeScan(h.scanName,e.scan)===h.scanName&&(!e.port||Number(e.port)===h.relayPort);e.on=!e.same}});
+  showImport(f.name)}
+ catch(e){toast('นำเข้า CSV ไม่สำเร็จ: '+e.message,7000)}}
+function showImport(fname){
+ customDialog('เพิ่ม Host จากไฟล์ CSV (Address Book ของ Xerox)','min(1180px,97vw)','เพิ่ม / อัปเดตรายการที่เลือก',
+  `<div class="hint" style="margin-bottom:6px">ไฟล์ <b>${esc(fname)}</b> · ${IMP.length} รายการ · ตรวจ <b>Host Name</b> ให้เป็น Computer name ของ Windows (หรือใส่ MAC แทน) ·
+  รายการที่ชี้มาที่ ESP32 (<span class="mono">${esc(S.device.ip)}</span>) ใช้พอร์ตในไฟล์เป็นพอร์ต Relay · ไม่นำเข้ารหัสผ่าน</div>
+  <div class="bar" style="margin-bottom:6px"><span class="sm">ต่อท้ายชื่อ Scan ด้วยชื่อเครื่อง Xerox:</span><select id="impPrn" class="btn s"><option value="">(ไม่ต่อท้าย)</option>${S.printers.map(p=>`<option>${esc(p.name)}</option>`).join('')}</select>
+  <button type="button" class="btn s" onclick="impAutoPort()">ให้พอร์ต Relay อัตโนมัติกับแถวที่ยังว่าง</button></div>
+  <div class="tw imp"><table><thead><tr><th></th><th>ชื่อ Scan (จากไฟล์)</th><th>ปลายทางในไฟล์</th><th>Share / ผู้ใช้</th><th>Host Name *</th><th>MAC (ถ้ามี)</th><th>พอร์ต Relay</th><th>ผล</th></tr></thead><tbody id="impRows"></tbody></table></div>
+  <div id="impErr" class="hint" style="color:var(--bad)"></div>`,applyImport,'impErr');
+ renderImp()}
+function renderImp(){$('#impRows').innerHTML=IMP.map((e,i)=>{const h=e.ex>=0?S.hosts[e.ex]:null;
+  const res=e.same?'<span class="b mut">มีแล้ว (ไม่เปลี่ยน)</span>':h?`<span class="b warn">อัปเดต Host ${esc(h.name)}</span>`:'<span class="b ok">เพิ่มใหม่</span>';
+  return`<tr class="${e.on?'':'off'}"><td><input type="checkbox" ${e.on?'checked':''} onchange="IMP[${i}].on=this.checked;this.closest('tr').className=this.checked?'':'off'"></td>
+  <td><b>${esc(e.scan)}</b>${e.src[0].display&&e.src[0].display!==e.src[0].nick?`<div class="sm">${esc(e.src[0].display)}</div>`:''}</td>
+  <td class="mono">${[...new Set(e.src.map(x=>x.addr))].map(esc).join('<br>')}</td>
+  <td class="sm">${e.src.map(x=>esc(x.share+(x.login?' / '+x.login:''))).join('<br>')}</td>
+  <td><input type="text" value="${esc(e.name)}" ${h?'disabled':''} oninput="IMP[${i}].name=this.value.trim()">${!h&&!e.nameSure?'<div class="sm" style="color:var(--warn)">ไฟล์ไม่มีชื่อเครื่อง – ตรวจ/แก้ หรือใส่ MAC</div>':''}</td>
+  <td><input type="text" value="${esc(e.mac)}" placeholder="AA:BB:CC:DD:EE:FF" ${h?'disabled':''} oninput="IMP[${i}].mac=this.value.trim()"></td>
+  <td><input type="text" value="${esc(e.port)}" style="width:80px;min-width:0" ${e.relay?'disabled':''} oninput="IMP[${i}].port=this.value.trim()"></td><td>${res}</td></tr>`}).join('')}
+function impAutoPort(){const used=new Set([...S.hosts.map(h=>h.relayPort),...IMP.map(e=>Number(e.port))].filter(Boolean));
+ IMP.forEach(e=>{if(!e.on||e.port)return;let p=4451;while(used.has(p))p++;used.add(p);e.port=String(p)});renderImp()}
+async function applyImport(){const l=hostCfg(),sel=IMP.filter(e=>e.on),prn=$('#impPrn').value;
+ if(!sel.length)throw new Error('ยังไม่ได้เลือกรายการ');
+ for(const e of sel){const scan=prn?e.scan.split(', ').map(x=>`${x} (${prn})`).join(', '):e.scan,port=Number(e.port)||0;
+  if(e.ex>=0){const h=l[e.ex];h.scanName=mergeScan(h.scanName,scan);if(port)h.relayPort=port;continue}
+  const name=cleanName(e.name);if(!name)throw new Error(`กรุณากรอก Host Name ของ "${e.scan}"`);
+  if(e.mac&&!normMac(e.mac))throw new Error(`MAC ของ "${e.scan}" ไม่ถูกต้อง`);
+  const d=e.src[0].display;
+  l.push({name,scanName:scan,mac:normMac(e.mac),aliases:'',fallback4:e.fallback4,fallback6:'',note:d&&d!==e.src[0].nick?d:'',enabled:true,relayPort:port})}
+ await post('/api/hosts',l);return `นำเข้าแล้ว ${sel.length} รายการ`}
+
 refresh();setInterval(()=>{if(!$('#dlg').open)refresh()},5000);
 </script></body></html>)rawliteral";

@@ -17,10 +17,54 @@
 static WebServer server(80);
 static uint32_t  rebootAt = 0;
 
+// ---- Login ----------------------------------------------------------------
+// The browser logs in on /api/login and gets a session cookie (kept in RAM: a reboot logs
+// everyone out). Basic auth is still accepted for tools such as ESP32Finder.
+static const uint32_t SESSION_IDLE_MS = 8UL * 3600 * 1000;
+static const int      LOGIN_MAX_FAILS = 5;          // then logins are refused for LOGIN_LOCK_MS
+static const uint32_t LOGIN_LOCK_MS   = 60000;
+
+struct WebSession { String token; uint32_t last = 0; };
+static WebSession webSess[4];
+static int        loginFails = 0;
+static uint32_t   loginLockAt = 0;
+
+static String cookieToken() {
+  String c = server.header("Cookie");
+  int i = c.indexOf("xsid=");
+  if (i < 0) return "";
+  int e = c.indexOf(';', i);
+  return c.substring(i + 5, e < 0 ? c.length() : e);
+}
+
+static WebSession* currentSession() {
+  String t = cookieToken();
+  if (t.length() != 32) return nullptr;
+  for (auto& s : webSess)
+    if (s.token == t && millis() - s.last < SESSION_IDLE_MS) return &s;
+  return nullptr;
+}
+
+static bool loginLocked() {
+  if (loginFails < LOGIN_MAX_FAILS) return false;
+  if (millis() - loginLockAt < LOGIN_LOCK_MS) return true;
+  loginFails = 0;
+  return false;
+}
+
+static void loginFailed() {
+  if (++loginFails >= LOGIN_MAX_FAILS) loginLockAt = millis();
+}
+
 static bool auth() {
   if (!cfg.auth.user.length()) return true;
-  if (server.authenticate(cfg.auth.user.c_str(), cfg.auth.pass.c_str())) return true;
-  server.requestAuthentication(BASIC_AUTH, "Xerox Host DNS");
+  if (WebSession* s = currentSession()) { s->last = millis(); return true; }
+  if (server.hasHeader("Authorization") && !loginLocked()) {
+    if (server.authenticate(cfg.auth.user.c_str(), cfg.auth.pass.c_str())) return true;
+    loginFailed();
+  }
+  if (server.uri() == "/") server.send_P(200, "text/html; charset=utf-8", LOGIN_HTML);
+  else server.send(401, "application/json", "{\"ok\":false,\"login\":true,\"error\":\"กรุณาเข้าสู่ระบบ\"}");
   return false;
 }
 
@@ -64,6 +108,60 @@ static bool parseBody(JsonDocument& doc) {
   return true;
 }
 
+// ---- POST /api/login /api/logout /api/password ------------------------------
+static void setSessionCookie(const String& token) {
+  server.sendHeader("Set-Cookie", "xsid=" + token + "; Path=/; HttpOnly; SameSite=Strict" + (token.length() ? "" : "; Max-Age=0"));
+}
+
+static void handleLogin() {
+  JsonDocument doc;
+  if (!parseBody(doc)) return;
+  if (loginLocked()) {
+    sendErr("ใส่รหัสผิดหลายครั้ง – รอ " + String((LOGIN_LOCK_MS - (millis() - loginLockAt)) / 1000 + 1) + " วินาทีแล้วลองใหม่", 429);
+    return;
+  }
+  if (cfg.auth.user.length() && !(cfg.auth.user == (doc["user"] | "") && cfg.auth.pass == (doc["pass"] | ""))) {
+    loginFailed();
+    sendErr("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง", 401);
+    return;
+  }
+  loginFails = 0;
+  WebSession* slot = &webSess[0];                        // a free slot, else the least recently used
+  for (auto& s : webSess) {
+    if (!s.token.length()) { slot = &s; break; }
+    if (millis() - s.last > millis() - slot->last) slot = &s;
+  }
+  char tok[33];
+  for (int i = 0; i < 4; i++) snprintf(tok + i * 8, 9, "%08lx", (unsigned long)esp_random());
+  slot->token = tok;
+  slot->last = millis();
+  setSessionCookie(slot->token);
+  sendOk();
+}
+
+static void handleLogout() {
+  if (WebSession* s = currentSession()) *s = WebSession();
+  setSessionCookie("");
+  sendOk();
+}
+
+static void handlePassword() {
+  if (!auth()) return;
+  JsonDocument doc;
+  if (!parseBody(doc)) return;
+  String user = doc["user"] | "", oldPass = doc["old"] | "", pass = doc["pass"] | "";
+  user.trim();
+  if (oldPass != cfg.auth.pass) { sendErr("รหัสผ่านปัจจุบันไม่ถูกต้อง"); return; }
+  if (!user.length() || user.length() > 32) { sendErr("ชื่อผู้ใช้ต้องมี 1–32 ตัวอักษร"); return; }
+  if (pass.length() < 6 || pass.length() > 64) { sendErr("รหัสผ่านใหม่ต้องมี 6–64 ตัวอักษร"); return; }
+  cfg.auth.user = user;
+  cfg.auth.pass = pass;
+  if (!configSave()) { sendErr("บันทึกลงหน่วยความจำไม่สำเร็จ", 500); return; }
+  WebSession* me = currentSession();                     // other browsers must log in again
+  for (auto& s : webSess) if (&s != me) s = WebSession();
+  sendOk();
+}
+
 // ---- GET /api/status -------------------------------------------------------
 static void handleStatus() {
   if (!auth()) return;
@@ -85,6 +183,7 @@ static void handleStatus() {
   dev["heap"] = ESP.getFreeHeap();
   dev["interval"] = cfg.res.interval;
   dev["onDemand"] = cfg.res.onDemand;
+  dev["user"] = cfg.auth.user;
   dev["maxRelay"] = MAX_RELAY_PORTS;
 
   JsonObject st = d["stats"].to<JsonObject>();
@@ -202,6 +301,7 @@ static void handleSaveSettings() {
   if (!parseBody(doc)) return;
   doc.remove("hosts");
   doc.remove("printers");
+  doc.remove("auth");                      // changed only through /api/password
   JsonVariantConst n = doc["net"];
   if (!(n["dhcp"] | true)) {
     uint32_t a;
@@ -364,6 +464,9 @@ void webBegin() {
     if (!auth()) return;
     server.send_P(200, "text/html; charset=utf-8", INDEX_HTML);
   });
+  server.on("/api/login", HTTP_POST, handleLogin);
+  server.on("/api/logout", HTTP_POST, handleLogout);
+  server.on("/api/password", HTTP_POST, handlePassword);
   server.on("/api/status", HTTP_GET, handleStatus);
   server.on("/api/config", HTTP_GET, handleGetConfig);
   server.on("/api/hosts", HTTP_POST, handleSaveHosts);
@@ -384,6 +487,8 @@ void webBegin() {
   server.on("/api/verify", HTTP_POST, handleVerifyStart);
   server.on("/api/verify", HTTP_GET, handleVerifyStatus);
   server.onNotFound([]() { server.send(404, "text/plain", "Not found"); });
+  const char* hdrs[] = {"Cookie"};
+  server.collectHeaders(hdrs, 1);
   server.begin();
 }
 
