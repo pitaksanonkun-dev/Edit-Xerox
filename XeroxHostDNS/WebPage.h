@@ -117,7 +117,7 @@ input.chg{border-color:var(--ok)!important;box-shadow:0 0 0 3px rgba(20,136,62,.
   <div class="chk"><input type="checkbox" id="s_answerAAAA"><span>ตอบ IPv6 (AAAA record)</span></div>
   <div class="chk"><input type="checkbox" id="s_restrict"><span>ให้บริการเฉพาะเครื่องพิมพ์ที่อยู่ในรายการเท่านั้น</span></div></div>
  <div class="card"><h2>การค้นหา IP ของ Host</h2><div class="f2">
-  <div><label>ตรวจเบื้องหลังทุก ๆ (วินาที)</label><input type="number" id="s_interval" min="5" max="86400"><div class="hint">3600 = ชั่วโมงละครั้ง (แนะนำ) · ค่าน้อยทำให้มีแพ็กเก็ตค้นหาในเครือข่ายบ่อยขึ้น</div></div>
+  <div><label>ตรวจเบื้องหลังทุก ๆ (วินาที)</label><input type="number" id="s_interval" min="5" max="86400"><div class="hint">1800 = ทุก 30 นาที (แนะนำ) · 3600 = ชั่วโมงละครั้ง · ค่าน้อยทำให้มีแพ็กเก็ตค้นหาในเครือข่ายบ่อยขึ้น</div></div>
   <div><label>เวลารอคำตอบต่อรอบ (ms)</label><input type="number" id="s_timeoutMs" min="200"></div>
   <div><label>Broadcast address เพิ่มเติม (คั่นด้วย ,)</label><input type="text" id="s_extraBcast" placeholder="192.168.2.255"></div></div>
   <div class="chk"><input type="checkbox" id="s_onDemand"><span><b>ค้นหา IP เมื่อ Xerox ส่งงานเท่านั้น (แนะนำ)</b> – ถ้าไม่ได้ยืนยัน IP ของ PC ภายใน 2 นาที จะถามก่อนส่งต่อ (ช้าลงประมาณ 1 วินาทีเฉพาะการเชื่อมต่อแรกของงาน) และไม่สแกนเครือข่ายตามรอบ</span></div>

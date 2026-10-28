@@ -1,11 +1,11 @@
-﻿#pragma once
+#pragma once
 // ---------------------------------------------------------------------------
 //  Xerox Host DNS Bridge - shared configuration & runtime state
 // ---------------------------------------------------------------------------
 #include <Arduino.h>
 #include <vector>
 
-#define FW_VERSION      "1.2.0"
+#define FW_VERSION      "1.2.1"
 #define MAX_HOSTS       64
 #define MAX_PRINTERS    32
 #define MAX_V6          4
@@ -34,7 +34,7 @@ struct DnsCfg {
 
 struct ResolverCfg {
   bool     onDemand  = true;       // look a PC up when a copier sends to it (relay / DNS query)
-  uint32_t interval  = 3600;       // seconds between background refreshes of each host
+  uint32_t interval  = 1800;       // seconds between background refreshes of each host (30 min)
   uint32_t timeoutMs = 800;        // wait time for replies per round
   bool     nbns      = true;       // NetBIOS Name Service (UDP 137)
   bool     llmnr     = true;       // LLMNR (UDP 5355)

@@ -113,7 +113,7 @@ input.chg{border-color:var(--ok)!important;box-shadow:0 0 0 3px rgba(20,136,62,.
   <div class="chk"><input type="checkbox" id="s_answerAAAA"><span>ตอบ IPv6 (AAAA record)</span></div>
   <div class="chk"><input type="checkbox" id="s_restrict"><span>ให้บริการเฉพาะเครื่องพิมพ์ที่อยู่ในรายการเท่านั้น</span></div></div>
  <div class="card"><h2>การค้นหา IP ของ Host</h2><div class="f2">
-  <div><label>ตรวจเบื้องหลังทุก ๆ (วินาที)</label><input type="number" id="s_interval" min="5" max="86400"><div class="hint">3600 = ชั่วโมงละครั้ง (แนะนำ) · ค่าน้อยทำให้มีแพ็กเก็ตค้นหาในเครือข่ายบ่อยขึ้น</div></div>
+  <div><label>ตรวจเบื้องหลังทุก ๆ (วินาที)</label><input type="number" id="s_interval" min="5" max="86400"><div class="hint">1800 = ทุก 30 นาที (แนะนำ) · 3600 = ชั่วโมงละครั้ง · ค่าน้อยทำให้มีแพ็กเก็ตค้นหาในเครือข่ายบ่อยขึ้น</div></div>
   <div><label>เวลารอคำตอบต่อรอบ (ms)</label><input type="number" id="s_timeoutMs" min="200"></div>
   <div><label>Broadcast address เพิ่มเติม (คั่นด้วย ,)</label><input type="text" id="s_extraBcast" placeholder="192.168.2.255"></div></div>
   <div class="chk"><input type="checkbox" id="s_onDemand"><span><b>ค้นหา IP เมื่อ Xerox ส่งงานเท่านั้น (แนะนำ)</b> – ถ้าไม่ได้ยืนยัน IP ของ PC ภายใน 2 นาที จะถามก่อนส่งต่อ (ช้าลงประมาณ 1 วินาทีเฉพาะการเชื่อมต่อแรกของงาน) และไม่สแกนเครือข่ายตามรอบ</span></div>
@@ -163,7 +163,7 @@ input.chg{border-color:var(--ok)!important;box-shadow:0 0 0 3px rgba(20,136,62,.
   const cfg = {
     net: { dhcp: false, ip: '192.168.20.10', mask: '255.255.255.0', gw: '192.168.20.1', dns: '192.168.20.5', hostname: 'xerox-dns' },
     dns: { upstream1: '192.168.20.5', upstream2: '8.8.8.8', ttl: 30, domain: 'company.local', anySuffix: true, answerAAAA: true, restrict: false },
-    res: { onDemand: true, interval: 3600, timeoutMs: 800, nbns: true, llmnr: true, mdns: true, passive: true, extraBcast: '', scanSubnets: '192.168.30.0/24', dnsLookup: false },
+    res: { onDemand: true, interval: 1800, timeoutMs: 800, nbns: true, llmnr: true, mdns: true, passive: true, extraBcast: '', scanSubnets: '192.168.30.0/24', dnsLookup: false },
     time: { tz: '<+07>-7', ntp: 'pool.ntp.org' },
     log: { changeDays: 90, relayDays: 30, queryDays: 3, queryPersist: false, maxKB: 512, flushMin: 5 },
     auth: { user: 'admin', pass: 'admin' }
@@ -426,7 +426,7 @@ input.chg{border-color:var(--ok)!important;box-shadow:0 0 0 3px rgba(20,136,62,.
   }
   function status() {
     return {
-      device: { fw: '1.2.0', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
+      device: { fw: '1.2.1', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
         ip: cfg.net.ip, mask: cfg.net.mask, gw: cfg.net.gw, dns: cfg.net.dns, dhcp: cfg.net.dhcp, uptime: uptime(),
         time: now(), heap: 182344 - sessions.length * 9000, interval: cfg.res.interval, onDemand: cfg.res.onDemand, maxRelay: MAX_RELAY },
       stats: Object.assign({}, stats),

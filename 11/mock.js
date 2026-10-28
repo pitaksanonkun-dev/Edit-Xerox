@@ -17,7 +17,7 @@
   const cfg = {
     net: { dhcp: false, ip: '192.168.20.10', mask: '255.255.255.0', gw: '192.168.20.1', dns: '192.168.20.5', hostname: 'xerox-dns' },
     dns: { upstream1: '192.168.20.5', upstream2: '8.8.8.8', ttl: 30, domain: 'company.local', anySuffix: true, answerAAAA: true, restrict: false },
-    res: { onDemand: true, interval: 3600, timeoutMs: 800, nbns: true, llmnr: true, mdns: true, passive: true, extraBcast: '', scanSubnets: '192.168.30.0/24', dnsLookup: false },
+    res: { onDemand: true, interval: 1800, timeoutMs: 800, nbns: true, llmnr: true, mdns: true, passive: true, extraBcast: '', scanSubnets: '192.168.30.0/24', dnsLookup: false },
     time: { tz: '<+07>-7', ntp: 'pool.ntp.org' },
     log: { changeDays: 90, relayDays: 30, queryDays: 3, queryPersist: false, maxKB: 512, flushMin: 5 },
     auth: { user: 'admin', pass: 'admin' }
@@ -280,7 +280,7 @@
   }
   function status() {
     return {
-      device: { fw: '1.2.0', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
+      device: { fw: '1.2.1', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
         ip: cfg.net.ip, mask: cfg.net.mask, gw: cfg.net.gw, dns: cfg.net.dns, dhcp: cfg.net.dhcp, uptime: uptime(),
         time: now(), heap: 182344 - sessions.length * 9000, interval: cfg.res.interval, onDemand: cfg.res.onDemand, maxRelay: MAX_RELAY },
       stats: Object.assign({}, stats),

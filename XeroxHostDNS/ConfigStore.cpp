@@ -199,7 +199,7 @@ void configFromJson(JsonVariantConst d) {
   JsonVariantConst r = d["res"];
   cfg.res.interval   = constrain(juint(r["interval"], cfg.res.interval), 5u, 86400u);
   if (r.is<JsonObjectConst>() && !r["onDemand"].is<bool>())   // config from v1.1.0 or older: 30 s polling
-    cfg.res.interval = max(cfg.res.interval, (uint32_t)3600);
+    cfg.res.interval = max(cfg.res.interval, (uint32_t)1800);
   cfg.res.onDemand   = jbool(r["onDemand"], cfg.res.onDemand);
   cfg.res.timeoutMs  = constrain(juint(r["timeoutMs"], cfg.res.timeoutMs), 200u, 5000u);
   cfg.res.nbns       = jbool(r["nbns"], cfg.res.nbns);
