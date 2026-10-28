@@ -126,6 +126,12 @@ bool discFindMac(const uint8_t* mac, uint32_t* ip, String* src) {
   return false;
 }
 
+String discNameOfMac(const uint8_t* mac) {
+  for (auto& n : nbrs)
+    if (memcmp(n.mac, mac, 6) == 0) return n.name;
+  return "";
+}
+
 bool discScanning() { return sweeping || requested; }
 
 void discOnNbstat(uint32_t ip, const uint8_t* mac, const char* name) {

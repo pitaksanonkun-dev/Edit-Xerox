@@ -6,6 +6,7 @@
 #include "HostDns.h"
 #include "LogStore.h"
 #include "NetGuard.h"
+#include "Notify.h"
 #include "PrinterMon.h"
 #include "Relay.h"
 #include "Resolver.h"
@@ -184,6 +185,10 @@ static void handleStatus() {
   dev["dhcp"] = cfg.net.dhcp;
   dev["netFallback"] = netGuardFallback();
   dev["netReason"] = netGuardReason();
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+  dev["ipv6"] = ETH.linkLocalIPv6().toString();
+#endif
+  netGuardConflictJson(d["conflict"].to<JsonObject>());
   dev["uptime"] = uptimeStr();
   dev["time"] = timeValid() ? nowStr() : String("");
   dev["heap"] = ESP.getFreeHeap();
@@ -318,6 +323,10 @@ static void handleSaveSettings() {
       return;
     }
   }
+  String sl = doc["notify"]["syslog"] | "";
+  sl.trim();
+  uint32_t slIp;
+  if (sl.length() && !parseIp4(sl, slIp)) { sendErr("IP ของ Syslog Server ไม่ถูกต้อง"); return; }
   String subnetErr = resolverCheckSubnets(doc["res"]["scanSubnets"] | "");
   if (subnetErr.length()) { sendErr(subnetErr); return; }
   NetCfg oldNet = cfg.net;
@@ -330,6 +339,13 @@ static void handleSaveSettings() {
                 oldTime.tz != cfg.time.tz || oldTime.ntp != cfg.time.ntp;
   if (oldRes.passive != cfg.res.passive || oldRes.mdns != cfg.res.mdns) resolverBegin();
   sendOk(reboot);
+}
+
+static void handleNotifyTest() {
+  if (!auth()) return;
+  if (!cfg.notify.syslog.length()) { sendErr("ยังไม่ได้ตั้ง Syslog Server (บันทึกการตั้งค่าก่อน)"); return; }
+  if (!notifySend(6, "ทดสอบการแจ้งเตือนจาก Xerox Host DNS Bridge")) { sendErr("ส่งไม่สำเร็จ – ตรวจ IP ของ Syslog Server"); return; }
+  sendOk();
 }
 
 static void handleResolve() {
@@ -481,6 +497,7 @@ void webBegin() {
   server.on("/api/printers", HTTP_POST, handleSavePrinters);
   server.on("/api/settings", HTTP_POST, handleSaveSettings);
   server.on("/api/resolve", HTTP_POST, handleResolve);
+  server.on("/api/notifytest", HTTP_POST, handleNotifyTest);
   server.on("/api/backup", HTTP_GET, handleBackup);
   server.on("/api/restore", HTTP_POST, handleRestore);
   server.on("/api/reboot", HTTP_POST, handleReboot);

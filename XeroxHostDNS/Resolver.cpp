@@ -3,10 +3,12 @@
 #include "ConfigStore.h"
 #include "Discovery.h"
 #include "HostDns.h"
+#include "NetGuard.h"
 #include "Util.h"
 #include <lwip/sockets.h>
 #include <lwip/inet.h>
 #include <vector>
+#include <ETH.h>
 
 // Sockets (kept to a minimum: lwIP has only 16 and the relay needs most of them)
 static int sNb = -1;    // UDP 137: NetBIOS + LLMNR queries/replies, NetBIOS registrations
@@ -394,6 +396,17 @@ void resolverOnMac(const uint8_t* mac, uint32_t ip, const char* method) {
 
 // ---- Own name: http://<hostname>/ (NetBIOS) and http://<hostname>.local/ (mDNS) -------
 // Lets a PC open the web UI without knowing the board's IP (e.g. after a DHCP fallback).
+static bool ownLinkLocal6(uint8_t* out) {
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+  esp_ip6_addr_t a;
+  if (!ETH.netif() || esp_netif_get_ip6_linklocal(ETH.netif(), &a) != ESP_OK) return false;
+  memcpy(out, a.addr, 16);
+  return true;
+#else
+  return false;
+#endif
+}
+
 static String ownLabel() {
   String h = cfg.net.hostname;
   int dot = h.indexOf('.');
@@ -433,29 +446,101 @@ static void answerMdns(const uint8_t* p, int len, const struct sockaddr_in& from
     uint16_t type = (p[o] << 8) | p[o + 1];
     bool unicast = p[o + 2] & 0x80;                   // QU bit
     o += 4;
-    if (!me.equalsIgnoreCase(name) || (type != 1 && type != 255)) continue;
+    if (!me.equalsIgnoreCase(name) || (type != 1 && type != 28 && type != 255)) continue;
     String lbl = ownLabel();
     if (lbl.length() > 63) return;
-    uint8_t r[128];
-    int n = 12;
+    // A + AAAA (IPv6 link-local): a browser that prefers IPv6 still reaches the board when
+    // another device uses its IPv4 address.
+    uint8_t v6[16];
+    bool has6 = ownLinkLocal6(v6);
+    uint8_t r[160];
+    int n = 12, an = 0;
     memset(r, 0, 12);
-    bool legacy = ntohs(from.sin_port) != 5353;       // one-shot resolver: echo the id
+    bool legacy = ntohs(from.sin_port) != 5353;       // one-shot resolver: echo the id and question
     if (legacy) { r[0] = p[0]; r[1] = p[1]; }
     r[2] = 0x84;                                      // response, authoritative
-    r[7] = 1;
     r[n++] = lbl.length(); memcpy(r + n, lbl.c_str(), lbl.length()); n += lbl.length();
     r[n++] = 5; memcpy(r + n, "local", 5); n += 5; r[n++] = 0;
-    if (legacy) {                                     // repeat the question, answer points to it
-      r[5] = 1;
-      uint8_t q[] = {0x00, 0x01, 0x00, 0x01, 0xC0, 0x0C};
-      memcpy(r + n, q, sizeof(q)); n += sizeof(q);
-    }
-    uint8_t rr[] = {0x00, 0x01, (uint8_t)(legacy ? 0x00 : 0x80), 0x01, 0, 0, 0, 120, 0, 4};
-    memcpy(r + n, rr, sizeof(rr)); n += sizeof(rr);
-    memcpy(r + n, &g_myIp, 4); n += 4;
+    bool named = false;                               // the name at offset 12 still needs its record fields
+    if (legacy) { r[5] = 1; r[n++] = 0; r[n++] = type; r[n++] = 0; r[n++] = 1; }
+    else named = true;
+    auto rec = [&](uint8_t t, const uint8_t* d, int dl) {
+      if (!named) { r[n++] = 0xC0; r[n++] = 0x0C; }
+      named = false;
+      uint8_t f[] = {0x00, t, (uint8_t)(legacy ? 0x00 : 0x80), 0x01, 0, 0, 0, 120, 0, (uint8_t)dl};
+      memcpy(r + n, f, sizeof(f)); n += sizeof(f);
+      memcpy(r + n, d, dl); n += dl;
+      an++;
+    };
+    rec(1, (const uint8_t*)&g_myIp, 4);
+    if (has6) rec(28, v6, 16);
+    r[7] = an;
     if (legacy || unicast) udpSend(sMd, from.sin_addr.s_addr, ntohs(from.sin_port), r, n);
     else udpSend(sMd, inet_addr(MDNS_GROUP), 5353, r, n);
     return;
+  }
+}
+
+// ---- Packets that carry our own IPv4 but were not sent by us: another device uses it ------
+// Its NetBIOS registrations / node status and mDNS answers reveal its name.
+static void fromOwnIp(const uint8_t* p, int len, uint16_t sport) {
+  if (len < 12) return;
+  bool resp = p[2] & 0x80;
+  uint8_t op = (p[2] >> 3) & 0x0f;
+  int qd = (p[4] << 8) | p[5];
+  int rrs = ((p[6] << 8) | p[7]) + ((p[8] << 8) | p[9]) + ((p[10] << 8) | p[11]);
+  char name[256];
+  int o = 12;
+  if (sport == 137) {
+    if (!resp && op != 5 && op != 8 && op != 9) return;           // our own queries loop back
+    for (int i = 0; i < qd + rrs; i++) {
+      o = dnsReadName(p, len, o, name, sizeof(name));
+      if (o < 0 || o + 4 > len) return;
+      uint16_t type = (p[o] << 8) | p[o + 1];
+      if (i < qd) { o += 4; continue; }
+      if (o + 10 > len) return;
+      uint16_t rdlen = (p[o + 8] << 8) | p[o + 9];
+      const uint8_t* rd = p + o + 10;
+      if (o + 10 + rdlen > len) return;
+      char nb[16]; uint8_t suffix;
+      if (type == 0x20 && rdlen >= 6 && !(rd[0] & 0x80) &&                 // unique name (not a workgroup)
+          strlen(name) >= 32 && nbDecode(name, nb, &suffix) && suffix == 0x00 && !ownLabel().equalsIgnoreCase(nb)) {
+        netGuardConflictName(nb, "NetBIOS"); return;
+      }
+      if (type == 0x21 && rdlen >= 19) {                           // node status: first unique name
+        for (int k = 0; k < rd[0] && 1 + (k + 1) * 18 <= rdlen; k++) {
+          const uint8_t* e = rd + 1 + k * 18;
+          if (e[15] != 0x00 || (((e[16] << 8) | e[17]) & 0x8000)) continue;
+          int l = 15;
+          while (l > 0 && (e[l - 1] == ' ' || e[l - 1] == 0)) l--;
+          String n((const char*)e, l);
+          if (n.length() && !ownLabel().equalsIgnoreCase(n)) { netGuardConflictName(n, "NetBIOS"); return; }
+        }
+      }
+      o += 10 + rdlen;
+    }
+  } else if (sport == 5353 && resp) {
+    for (int i = 0; i < qd + rrs; i++) {
+      o = dnsReadName(p, len, o, name, sizeof(name));
+      if (o < 0 || o + 4 > len) return;
+      uint16_t type = (p[o] << 8) | p[o + 1];
+      if (i < qd) { o += 4; continue; }
+      if (o + 10 > len) return;
+      uint16_t rdlen = (p[o + 8] << 8) | p[o + 9];
+      int rdo = o + 10;
+      if (rdo + rdlen > len) return;
+      String host;
+      if (type == 12) {                                            // PTR <our ip>.in-addr.arpa -> name.local
+        char t[256];
+        if (dnsReadName(p, len, rdo, t, sizeof(t)) > 0) host = t;
+      } else if (type == 1 && rdlen == 4 && memcmp(p + rdo, &g_myIp, 4) == 0) {
+        host = name;
+      }
+      int dot = host.indexOf('.');
+      if (dot > 0) host = host.substring(0, dot);
+      if (host.length() && !ownLabel().equalsIgnoreCase(host)) { netGuardConflictName(host, "mDNS"); return; }
+      o = rdo + rdlen;
+    }
   }
 }
 
@@ -466,7 +551,10 @@ static void drain(int s) {
     socklen_t fl = sizeof(from);
     int n = recvfrom(s, pkt, sizeof(pkt), 0, (struct sockaddr*)&from, &fl);
     if (n <= 0) break;
-    if (from.sin_addr.s_addr == g_myIp) continue;   // our own multicast/broadcast
+    if (from.sin_addr.s_addr == g_myIp) {          // our own multicast/broadcast - or another device using our IP
+      fromOwnIp(pkt, n, ntohs(from.sin_port));
+      continue;
+    }
     uint16_t sport = ntohs(from.sin_port);
     if (sport == 5355) handleDnsStyle(pkt, n, M_LLMNR);
     else if (s == sMd || sport == 5353) { if (s == sMd) answerMdns(pkt, n, from); handleDnsStyle(pkt, n, M_MDNS); }
@@ -654,6 +742,25 @@ void resolverLoop() {
 
 void resolverSeen(int idx, uint32_t ip, const char* method) {
   if (idx >= 0 && idx < (int)hostState.size()) observe4(idx, ip, method, false);
+}
+
+// (A NetBIOS node status would not help: the other device answers to "our" IP, i.e. itself.)
+void resolverAskOwnIpName() {
+  uint8_t b[128];
+  if (sMd >= 0) {                                   // mDNS reverse lookup: <d>.<c>.<b>.<a>.in-addr.arpa PTR?
+    const uint8_t* ip = (const uint8_t*)&g_myIp;
+    int n = 12;
+    memset(b, 0, 12);
+    b[5] = 1;
+    for (int i = 3; i >= 0; i--) {
+      String o(ip[i]);
+      b[n++] = o.length(); memcpy(b + n, o.c_str(), o.length()); n += o.length();
+    }
+    b[n++] = 7; memcpy(b + n, "in-addr", 7); n += 7;
+    b[n++] = 4; memcpy(b + n, "arpa", 4); n += 4; b[n++] = 0;
+    b[n++] = 0; b[n++] = 12; b[n++] = 0; b[n++] = 1;
+    udpSend(sMd, inet_addr(MDNS_GROUP), 5353, b, n);
+  }
 }
 
 void resolverPrioritize(int idx) {

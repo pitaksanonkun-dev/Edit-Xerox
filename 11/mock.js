@@ -20,7 +20,8 @@
     res: { onDemand: true, interval: 1800, timeoutMs: 800, nbns: true, llmnr: true, mdns: true, passive: true, extraBcast: '', scanSubnets: '192.168.30.0/24', dnsLookup: false },
     time: { tz: '<+07>-7', ntp: 'pool.ntp.org' },
     log: { changeDays: 90, relayDays: 30, queryDays: 3, queryPersist: false, maxKB: 512, flushMin: 5 },
-    auth: { user: 'admin', pass: 'admin' }
+    auth: { user: 'admin', pass: 'admin' },
+    notify: { syslog: '', syslogPort: 514 }
   };
 
   const H = (name, o) => Object.assign({
@@ -249,10 +250,10 @@
   }
   function status() {
     return {
-      device: { fw: '1.6.1', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
+      device: { fw: '1.7.0', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
         ip: cfg.net.ip, mask: cfg.net.mask, gw: cfg.net.gw, dns: cfg.net.dns, dhcp: cfg.net.dhcp, uptime: uptime(),
-        time: now(), heap: 182344 - sessions.length * 9000, interval: cfg.res.interval, onDemand: cfg.res.onDemand, maxRelay: MAX_RELAY, user: cfg.auth.user, netFallback: false, netReason: '' },
-      stats: Object.assign({}, stats),
+        time: now(), heap: 182344 - sessions.length * 9000, interval: cfg.res.interval, onDemand: cfg.res.onDemand, maxRelay: MAX_RELAY, user: cfg.auth.user, netFallback: false, netReason: '', ipv6: 'fe80::aa03:2aff:fe6f:1234' },
+      stats: Object.assign({}, stats), conflict: { active: false },
       hosts: hosts.map(h => ({
         name: h.name, scanName: h.scanName || '', mac: h.mac, aliases: h.aliases, fallback4: h.fallback4, fallback6: h.fallback6, note: h.note, enabled: h.enabled,
         ipv4: h.ipv4, ipv6: h.ipv6, method: h.method, lastSeen: h.lastSeen, ago: h.seenMs ? Math.floor((Date.now() - h.seenMs) / 1000) : -1,
@@ -280,6 +281,7 @@
     const body = opt && opt.body ? JSON.parse(opt.body) : null;
     switch (method + ' ' + u.pathname) {
       case 'GET /api/status': return reply(status());
+      case 'POST /api/notifytest': return cfg.notify.syslog ? ok() : err('ยังไม่ได้ตั้ง Syslog Server (บันทึกการตั้งค่าก่อน)');
       case 'POST /api/login':
         if (body.user !== cfg.auth.user || body.pass !== cfg.auth.pass) return reply({ ok: false, error: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' }, 401);
         loggedOut(false); return ok();
@@ -333,7 +335,7 @@
           body.log = { changeDays: c(body.log.changeDays, 1, 365), relayDays: c(body.log.relayDays, 1, 365), queryDays: c(body.log.queryDays, 1, 30),
             maxKB: c(body.log.maxKB, 64, 800), flushMin: c(body.log.flushMin, 1, 60), queryPersist: !!body.log.queryPersist };
         }
-        for (const g of ['net', 'dns', 'res', 'time', 'log']) Object.assign(cfg[g], body[g]);
+        for (const g of ['net', 'dns', 'res', 'time', 'log', 'notify']) Object.assign(cfg[g], body[g]);
         return ok(oldNet !== JSON.stringify(cfg.net) + cfg.time.tz + cfg.time.ntp);
       }
       case 'POST /api/resolve': {

@@ -5,7 +5,7 @@
 #include <Arduino.h>
 #include <vector>
 
-#define FW_VERSION      "1.6.1"
+#define FW_VERSION      "1.7.0"
 #define MAX_HOSTS       100
 #define MAX_PRINTERS    32
 #define MAX_V6          4
@@ -63,6 +63,11 @@ struct LogCfg {
   uint16_t flushMin     = 5;       // write the RAM buffer to flash every N minutes
 };
 
+struct NotifyCfg {
+  String   syslog;                 // Syslog server IPv4 (blank = off)
+  uint16_t syslogPort = 514;
+};
+
 struct AuthCfg {
   String user = "admin";
   String pass = "admin";
@@ -90,6 +95,7 @@ struct AppConfig {
   TimeCfg     time;
   LogCfg      log;
   AuthCfg     auth;
+  NotifyCfg   notify;
   std::vector<PrinterCfg> printers;
   std::vector<HostCfg>    hosts;
 };

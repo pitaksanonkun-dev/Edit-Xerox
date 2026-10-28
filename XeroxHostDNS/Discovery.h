@@ -13,6 +13,7 @@ void discArpRequest(uint32_t ip);               // ask who has <ip>
 void discArpProbe(uint32_t ip);                 // flush stale ARP entries, then ask who has <ip>
 bool discArpLookup(uint32_t ip, uint8_t* mac);  // MAC currently cached for <ip>
 bool discFindMac(const uint8_t* mac, uint32_t* ip, String* src);   // from the neighbor table
+String discNameOfMac(const uint8_t* mac);       // NetBIOS name last seen for this MAC ("" = unknown)
 bool discScanning();
 void discOnNbstat(uint32_t ip, const uint8_t* mac, const char* name);
 void discNeighborsJson(JsonDocument& doc);

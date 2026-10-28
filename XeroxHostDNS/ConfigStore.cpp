@@ -156,6 +156,8 @@ void configToJson(JsonDocument& doc, bool withSecrets) {
   l["changeDays"] = cfg.log.changeDays; l["relayDays"] = cfg.log.relayDays; l["queryDays"] = cfg.log.queryDays;
   l["queryPersist"] = cfg.log.queryPersist; l["maxKB"] = cfg.log.maxKB; l["flushMin"] = cfg.log.flushMin;
 
+  JsonObject nt = doc["notify"].to<JsonObject>();
+  nt["syslog"] = cfg.notify.syslog; nt["syslogPort"] = cfg.notify.syslogPort;
   JsonObject a = doc["auth"].to<JsonObject>();
   a["user"] = cfg.auth.user;
   if (withSecrets) a["pass"] = cfg.auth.pass;
@@ -222,6 +224,11 @@ void configFromJson(JsonVariantConst d) {
   cfg.log.queryPersist = jbool(l["queryPersist"], cfg.log.queryPersist);
   cfg.log.maxKB        = constrain(juint(l["maxKB"], cfg.log.maxKB), 64u, 800u);   // re-capped at runtime to 60 % of the FS
   cfg.log.flushMin     = constrain(juint(l["flushMin"], cfg.log.flushMin), 1u, 60u);
+
+  JsonVariantConst nt = d["notify"];
+  cfg.notify.syslog = jstr(nt["syslog"], cfg.notify.syslog);
+  cfg.notify.syslog.trim();
+  cfg.notify.syslogPort = constrain(juint(nt["syslogPort"], cfg.notify.syslogPort), 1u, 65535u);
 
   JsonVariantConst a = d["auth"];
   cfg.auth.user = jstr(a["user"], cfg.auth.user);

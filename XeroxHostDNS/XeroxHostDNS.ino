@@ -27,6 +27,7 @@
 #include "HostDns.h"
 #include "LogStore.h"
 #include "NetGuard.h"
+#include "Notify.h"
 #include "PortMux.h"
 #include "PrinterMon.h"
 #include "Relay.h"
@@ -97,6 +98,7 @@ static void startEthernet() {
 #if ESP_ARDUINO_VERSION_MAJOR >= 3
   Network.onEvent(onNetEvent);
   ETH.begin(ETH_PHY_LAN8720, ETH_PHY_ADDR_WT32, ETH_MDC_WT32, ETH_MDIO_WT32, ETH_PHY_POWER_WT32, ETH_CLK_WT32);
+  ETH.enableIPv6();            // link-local fe80:: address: web UI reachable even when the IPv4 is taken
 #else
   WiFi.onEvent(onNetEvent);
   ETH.begin(ETH_PHY_ADDR_WT32, ETH_PHY_POWER_WT32, ETH_MDC_WT32, ETH_MDIO_WT32, ETH_PHY_LAN8720, ETH_CLK_WT32);
@@ -127,6 +129,7 @@ static void checkNetwork() {
     dnsBegin();
     resolverBegin();
     relayBegin();
+    notifySend(6, String("ESP32 พร้อมใช้งาน v") + FW_VERSION + " IP " + ip4Str(ip) + (cfg.net.dhcp ? " (DHCP)" : netGuardFallback() ? " (DHCP สำรอง)" : " (Static)"));
     if (!ntpStarted) {
       configTzTime(cfg.time.tz.c_str(), cfg.time.ntp.c_str(), "time.google.com");
       ntpStarted = true;

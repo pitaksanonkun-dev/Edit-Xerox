@@ -169,6 +169,12 @@ dialog form{padding:16px 18px;max-height:90vh;overflow:auto}
   <div class="hint">ส่งคำถามแบบ unicast ไปทุก IP ในวงนั้นทุกรอบ (/22–/30) – Firewall ของ PC ต้องอนุญาต UDP 137 จากวงของ ESP32</div>
   <div class="chk"><input type="checkbox" id="s_dnsLookup"><span>ถาม DNS ของบริษัท (Active Directory) ด้วยชื่อ Host + Domain suffix ด้านบน</span></div>
   <div class="hint">เหมาะกับเครื่องที่ join domain และลงทะเบียน DNS อัตโนมัติ ต้องกรอก Upstream DNS เป็น DNS ของ AD และ Domain suffix</div></div>
+ <div class="card"><h2>แจ้งเตือนอัตโนมัติ (Syslog)</h2><div class="f2">
+  <div><label>Syslog Server (IPv4) – เว้นว่าง = ไม่ส่ง</label><input type="text" id="s_syslog" placeholder="192.168.20.5"></div>
+  <div><label>พอร์ต (UDP)</label><input type="number" id="s_syslogPort" min="1" max="65535"></div></div>
+  <div class="hint">ESP32 ส่งข้อความไปเองเมื่อ: IP ชน (บอกชื่อ/MAC เครื่องที่ชน และส่งซ้ำทุก 10 นาทีจนกว่าจะหาย) · เปลี่ยนไปใช้ DHCP สำรอง · เปิดเครื่อง/ได้ IP ใหม่ (บอก IP ปัจจุบัน) ·
+   ใช้ UDP จึงส่งออกได้แม้ IP ชน · ตัวรับ: FortiGate/FortiAnalyzer, Syslog Server ของบริษัท หรือโปรแกรมฟรีบน PC เช่น Visual Syslog Server</div>
+  <div class="bar" style="margin-top:8px"><button type="button" class="btn" onclick="testNotify()">ส่งข้อความทดสอบ</button><span class="sm">กด บันทึกการตั้งค่า ก่อนทดสอบ</span></div></div>
  <div class="card"><h2>เวลา</h2><div class="f2">
   <div><label>Time zone (POSIX)</label><input type="text" id="s_tz"></div><div><label>NTP Server</label><input type="text" id="s_ntp"></div></div>
   <div class="hint">เปลี่ยนชื่อผู้ใช้ / รหัสผ่านผู้ดูแลที่เมนู 👤 มุมขวาบน → เปลี่ยนรหัสผ่าน</div></div>
@@ -205,11 +211,13 @@ function render(){const d=S.device,st=S.stats;$('#acctName').textContent=$('#acc
  $('#hdr').textContent=`IP ${d.ip||'-'} · ${d.link?'Link '+d.speed+'Mbps':'สายแลนไม่เชื่อมต่อ'} · ${d.time||'uptime '+d.uptime} · v${d.fw}`;
  $('#dnsNote').innerHTML=`<b>โหมด Relay (แนะนำ):</b> ใน Xerox เลือก Address Type = <b>IPv4 Address</b> ใส่ IP <b class="ip">${esc(d.ip)}</b> และ Port ตามคอลัมน์ "Relay" ของแต่ละ Host<br>`+
   `<b>โหมด DNS:</b> ตั้ง DNS Server ของ Xerox เป็น <b class="ip">${esc(d.ip)}</b> แล้วใช้ Address Type = Host Name`+(d.dhcp?' <span class="b warn">ESP32 ใช้ DHCP อยู่ – แนะนำตั้ง Static IP</span>':'')+
+  (S.conflict&&S.conflict.active?`<div style="margin-top:6px;color:var(--bad)"><b>⚠ IP ${esc(S.conflict.ip)} ชนกับ${S.conflict.name?` เครื่อง <span class="mono">${esc(S.conflict.name)}</span>`:'อุปกรณ์อื่น'} (MAC <span class="mono">${esc(S.conflict.mac)}</span>)</b>${S.conflict.name?` <span class="sm">· ทราบชื่อจาก ${esc(S.conflict.via)}</span>`:' <span class="sm">· ยังไม่ทราบชื่อ – ค้นหา MAC นี้ในตาราง DHCP/ARP ของ Router หรือ Switch</span>'}<br>
+   ตั้งแต่ ${esc(S.conflict.since)} · ESP32 ยังใช้ IP เดิม แต่ Xerox อาจส่งงานไม่ผ่าน – ให้เครื่องนั้นเปลี่ยน IP · ระหว่างนี้เปิดหน้าเว็บได้ที่ <span class="mono">http://${esc(d.hostname)}.local/</span> (IPv6)</div>`:'')+
   (d.netFallback?`<div style="margin-top:6px;color:var(--bad)"><b>⚠ ใช้ DHCP สำรองอยู่ (IP ตอนนี้ ${esc(d.ip)})</b> – ${esc(d.netReason)} · Xerox ที่ตั้งไว้เป็น IP เดิมจะส่งไม่ได้ ให้แก้ Static IP ในแท็บ ตั้งค่า ให้ตรงวงนี้ หรือย้ายกลับวงเดิมแล้วรีบูต</div>`:'');
  const hOn=S.hosts.filter(h=>h.status==='online').length,pOn=S.printers.filter(p=>p.online).length,jobs=S.hosts.reduce((a,h)=>a+h.relayJobs,0);
  $('#kpis').innerHTML=[[`${hOn}/${S.hosts.length}`,'Host ที่พบ IP'],[`${pOn}/${S.printers.length}`,'เครื่องพิมพ์ออนไลน์'],[jobs,'งานที่ส่งผ่าน Relay'],[S.sessions.length,'กำลังส่งตอนนี้'],[st.local,'คำตอบ DNS ชื่อ Host'],[d.uptime,'Uptime']]
   .map(k=>`<div class="card kpi"><div class="v">${esc(k[0])}</div><div class="l">${k[1]}</div></div>`).join('');
- $('#devTbl').innerHTML=[['IP / Mask',`${d.ip} / ${d.mask}`],['Gateway',d.gw],['DNS ของ ESP32',d.dns],['MAC',d.mac],['ชื่ออุปกรณ์',d.hostname],['โหมด IP',d.dhcp?'DHCP':d.netFallback?'DHCP สำรอง (Static ใช้ไม่ได้ในวงนี้)':'Static'],['ลิงก์',d.link?`${d.speed} Mbps ${d.duplex}`:'ไม่เชื่อมต่อ'],['หน่วยความจำว่าง',d.heap+' bytes'],['DNS query ทั้งหมด',`${st.queries} (ปฏิเสธ ${st.refused}, ล้มเหลว ${st.failed})`]]
+ $('#devTbl').innerHTML=[['IP / Mask',`${d.ip} / ${d.mask}`],['Gateway',d.gw],['DNS ของ ESP32',d.dns],['MAC',d.mac],['IPv6 (ทางเข้าสำรอง)',d.ipv6&&!/^::?$/.test(d.ipv6)&&d.ipv6!=='::'?`${d.ipv6}  →  http://${d.hostname}.local/`:'ยังไม่มี'],['ชื่ออุปกรณ์',d.hostname],['โหมด IP',d.dhcp?'DHCP':d.netFallback?'DHCP สำรอง (Static ใช้ไม่ได้ในวงนี้)':'Static'],['ลิงก์',d.link?`${d.speed} Mbps ${d.duplex}`:'ไม่เชื่อมต่อ'],['หน่วยความจำว่าง',d.heap+' bytes'],['DNS query ทั้งหมด',`${st.queries} (ปฏิเสธ ${st.refused}, ล้มเหลว ${st.failed})`]]
   .map(r=>`<tr><th style="width:200px">${r[0]}</th><td class="mono">${esc(r[1])}</td></tr>`).join('');
  $('#hostRows').innerHTML=S.hosts.length?S.hosts.map((h,i)=>`<tr><td>${h.scanName?`<b>${esc(h.scanName)}</b>`:'<span class="b mut">ยังไม่มีชื่อ Scan – กด แก้ไข</span>'}<div class="sm">Host: <span class="mono" style="color:var(--fg)">${esc(h.name)}</span></div>${h.mac?`<div class="sm mono">MAC ${esc(h.mac)}</div>`:''}${h.aliases?`<div class="sm">ชื่อแฝง: ${esc(h.aliases)}</div>`:''}${h.note?`<div class="sm">${esc(h.note)}</div>`:''}</td>
   <td>${badge(h.status)}${h.fails>1?`<div class="sm">ไม่ตอบ ${h.fails} รอบ</div>`:''}</td>
@@ -365,7 +373,7 @@ async function testName(){const n=$('#testName').value.trim();if(!n)return;const
  $('#testOut').innerHTML=r.match?`ตรงกับ Host <b>${esc(r.match)}</b> → IPv4 <b class="mono">${esc(r.ipv4||'ยังไม่ทราบ')}</b> (${r.status==='online'?'ออนไลน์':'ยังไม่พบในรอบล่าสุด'})`:'ไม่ตรงกับ Host ใดในรายการ — คำถามนี้จะถูกส่งต่อไปยัง Upstream DNS'}
 
 const SF={net:['dhcp','ip','mask','gw','dns','hostname','autoFallback'],dns:['upstream1','upstream2','ttl','domain','anySuffix','answerAAAA','restrict'],
- res:['onDemand','interval','timeoutMs','extraBcast','nbns','llmnr','mdns','passive','scanSubnets','dnsLookup'],time:['tz','ntp']};
+ res:['onDemand','interval','timeoutMs','extraBcast','nbns','llmnr','mdns','passive','scanSubnets','dnsLookup'],time:['tz','ntp'],notify:['syslog','syslogPort']};
 async function loadSettings(){try{C=await api('/api/config')}catch(e){toast(e.message);return}
  for(const g in SF)SF[g].forEach(k=>{const e=$('#s_'+k);if(!e)return;const v=C[g]?.[k];if(e.type==='checkbox')e.checked=!!v;else e.value=v??''});togDhcp()}
 // Switching DHCP off fills Mask / Gateway / DNS with what DHCP gave the ESP32 right now; the IP is left to the user.
@@ -388,6 +396,7 @@ async function saveSettings(ev){ev.preventDefault();const b={};
  for(const g in SF){b[g]={};SF[g].forEach(k=>{const e=$('#s_'+k);b[g][k]=e.type==='checkbox'?e.checked:e.type==='number'?Number(e.value):e.value.trim()})}
  try{const r=await post('/api/settings',b);
   if(r.reboot){if(confirm('บันทึกแล้ว ต้องรีบูตเพื่อใช้ค่าเครือข่าย/เวลาใหม่ รีบูตเลยหรือไม่?'))reboot(true)}else toast('บันทึกการตั้งค่าแล้ว')}catch(e){toast('ผิดพลาด: '+e.message,6000)}}
+async function testNotify(){try{await post('/api/notifytest');toast('ส่งข้อความทดสอบแล้ว – ตรวจที่ Syslog Server')}catch(e){toast('ผิดพลาด: '+e.message,6000)}}
 async function reboot(nc){if(!nc&&!confirm('รีบูตอุปกรณ์?'))return;await post('/api/reboot');toast('กำลังรีบูต… รอสักครู่แล้วรีเฟรชหน้า (ถ้าเปลี่ยน IP ให้เปิดด้วย IP ใหม่)',10000)}
 async function factory(){if(!confirm('คืนค่าโรงงาน? รายการ Host/เครื่องพิมพ์และการตั้งค่าทั้งหมดจะถูกลบ'))return;await post('/api/factory');toast('กำลังคืนค่าโรงงานและรีบูต…',10000)}
 async function restore(inp){const f=inp.files[0];if(!f)return;try{const j=JSON.parse(await f.text());await post('/api/restore',j);toast('กู้คืนแล้ว กำลังรีบูต…',10000)}catch(e){toast('กู้คืนไม่สำเร็จ: '+e.message,6000)}inp.value=''}
