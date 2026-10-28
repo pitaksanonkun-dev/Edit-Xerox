@@ -50,6 +50,7 @@ struct Session {
   Pipe c2s, s2c;
   SmbStream mc, ms;                // client->server, server->client
   bool smb = false, encrypted = false, emptyPw = false, removed = false, authed = false;
+  bool pcSeen = false;              // the PC answered SMB: host status -> online
   String user, share, opened, file;
   uint64_t written = 0;
   uint16_t writes = 0;
@@ -147,6 +148,10 @@ static void smbRequest(Session& s, uint16_t cmd, const uint8_t* m, int n) {
 }
 
 static void smbResponse(Session& s, uint16_t cmd, uint32_t status) {
+  if (!s.pcSeen) {
+    s.pcSeen = true;
+    resolverSeen(hostIndex(s.host), s.target, "Relay (SMB)");
+  }
   if (cmd == SMB_SESSION_SETUP && status == 0) s.authed = true;
   if ((status & 0xC0000000) != 0xC0000000 || s.err) return;  // only the first real error counts
   if (status == 0xC0000016) return;                           // MORE_PROCESSING_REQUIRED (NTLM step)
@@ -256,7 +261,7 @@ static void endSession(Session& s, bool ok, const String& result, bool counted =
   s.up = s.down = 0;
   for (Pipe* p : {&s.c2s, &s.s2c}) { p->len = p->off = 0; p->eof = p->shut = false; }
   for (SmbStream* t : {&s.mc, &s.ms}) { t->nbn = 0; t->len = t->got = t->capn = 0; }
-  s.smb = s.encrypted = s.emptyPw = s.removed = s.authed = false;
+  s.smb = s.encrypted = s.emptyPw = s.removed = s.authed = s.pcSeen = false;
   s.user = s.share = s.opened = s.file = "";
   s.written = 0;
   s.writes = s.errCmd = 0;

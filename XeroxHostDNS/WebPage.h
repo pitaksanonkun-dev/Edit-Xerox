@@ -97,6 +97,7 @@ dialog form{padding:16px 18px;max-height:90vh;overflow:auto}
  <div class="card"><h2>รายการ Scan ปลายทาง (อ้างอิงชื่อ Scan ในเครื่อง Xerox)</h2>
  <div class="bar"><button class="btn p" onclick="editHost(-1)">+ เพิ่ม Host</button>
  <label class="btn" style="margin:0;color:inherit">📄 เพิ่ม Host จากไฟล์ CSV<input type="file" accept=".csv,text/csv" style="display:none" onchange="importCsv(this)"></label>
+ <button class="btn" onclick="csvTemplate()" title="ไฟล์ตัวอย่างรูปแบบเดียวกับ Address Book ที่ Export จาก Xerox">⬇ Template CSV</button>
  <button class="btn" onclick="resolveAll()">ค้นหา IP ใหม่ทั้งหมด</button>
  <span class="sm" id="intv"></span></div>
  <div class="tw"><table><thead><tr><th>ชื่อ Scan (ใน Xerox)</th><th>สถานะ</th><th>IPv4</th><th>IPv6</th><th>พบโดย</th><th>พบล่าสุด</th><th>Relay (กรอกใน Xerox)</th><th>DNS</th><th></th></tr></thead><tbody id="hostRows"></tbody></table></div></div>
@@ -426,6 +427,16 @@ function decodeCsv(buf){const b=new Uint8Array(buf);
  try{return new TextDecoder('utf-8',{fatal:true}).decode(buf).replace(/^﻿/,'')}catch(e){return new TextDecoder('windows-874').decode(buf)}}
 function mergeScan(old,add){const a=String(old||'').split(',').map(x=>x.trim()).filter(Boolean);
  String(add||'').split(',').map(x=>x.trim()).filter(Boolean).forEach(x=>{if(!a.some(y=>y.toLowerCase()===x.toLowerCase()))a.push(x)});return a.join(', ')}
+// Template in the Xerox address book export format (the same file can also be imported into the copier).
+const CSV_COLS='XrxAddressBookId,DisplayName,FirstName,LastName,Company,XrxAllFavoritesOrder,MemberOf,IsDL,XrxApplicableWorkflows,FaxNumber,XrxIsFaxFavorite,E-mailAddress,XrxIsEmailFavorite,InternetFaxAddress,ScanNickName,XrxIsScanFavorite,ScanTransferProtocol,ScanServerAddress,ScanServerPort,ScanDocumentPath,ScanLoginName,ScanLoginPassword,ScanSMBShare,ScanNDSTree,ScanNDSContext,ScanNDSVolume'.split(',');
+function csvTemplate(){const ip=S.device.ip||'192.168.1.10',q=v=>/[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;
+ const rows=[{XrxAddressBookId:1,DisplayName:'Accounting',FirstName:'Accounting',ScanNickName:'acc-scan',ScanServerAddress:ip,ScanServerPort:'4451',ScanLoginName:'scan',ScanSMBShare:'scan'},
+  {XrxAddressBookId:2,DisplayName:'HR',FirstName:'HR',ScanNickName:'hr-scan',ScanServerAddress:ip,ScanServerPort:'',ScanLoginName:'scan',ScanSMBShare:'scan'},
+  {XrxAddressBookId:3,DisplayName:'Sales',FirstName:'Sales',ScanNickName:'sales-scan',ScanServerAddress:'DESKTOP-SALES01',ScanServerPort:'',ScanLoginName:'scan',ScanSMBShare:'scan'}];
+ const def=c=>/^(IsDL|XrxIsFaxFavorite|XrxIsEmailFavorite|XrxIsScanFavorite)$/.test(c)?0:c==='ScanTransferProtocol'?3:'';
+ const txt='\uFEFF'+[CSV_COLS.join(','),...rows.map(r=>CSV_COLS.map(c=>q(String(r[c]??def(c)))).join(','))].join('\r\n')+'\r\n';
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'text/csv;charset=utf-8'}));a.download='AddressBook_Template.csv';a.click();
+ toast('ดาวน์โหลด Template แล้ว – ScanServerAddress = IP ของ ESP32 หรือชื่อเครื่อง PC · ScanServerPort เว้นว่างได้ (ระบบสร้างพอร์ต Relay ให้)',8000)}
 let IMP=[];
 async function importCsv(inp){const f=inp.files[0];inp.value='';if(!f)return;
  try{const rows=parseCsv(decodeCsv(await f.arrayBuffer()));

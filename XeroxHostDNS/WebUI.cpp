@@ -59,7 +59,10 @@ static void loginFailed() {
 static bool auth() {
   if (!cfg.auth.user.length()) return true;
   if (WebSession* s = currentSession()) { s->last = millis(); return true; }
-  if (server.hasHeader("Authorization") && !loginLocked()) {
+  // Browsers keep re-sending Basic credentials from older firmware, which would make logout
+  // impossible: Basic auth is only for tools (ESP32Finder sends no browser User-Agent).
+  bool browser = server.header("User-Agent").indexOf("Mozilla") >= 0;
+  if (!browser && server.hasHeader("Authorization") && !loginLocked()) {
     if (server.authenticate(cfg.auth.user.c_str(), cfg.auth.pass.c_str())) return true;
     loginFailed();
   }
@@ -217,7 +220,9 @@ static void handleStatus() {
     o["relayFails"] = h.relayFails;
     o["relayBytes"] = h.relayBytes;
     o["relayLast"] = h.relayLast;
-    const char* status = !c.enabled ? "disabled" : h.rounds == 0 ? "pending" : h.fails == 0 ? "online" : "offline";
+    // a sighting between rounds (name announcement, ARP, a scan through the relay) counts at once
+    const char* status = !c.enabled ? "disabled" : h.fails == 0 && (h.rounds || h.lastSeenMs) ? "online"
+                       : h.rounds == 0 ? "pending" : "offline";
     o["status"] = status;
   }
 
@@ -487,8 +492,8 @@ void webBegin() {
   server.on("/api/verify", HTTP_POST, handleVerifyStart);
   server.on("/api/verify", HTTP_GET, handleVerifyStatus);
   server.onNotFound([]() { server.send(404, "text/plain", "Not found"); });
-  const char* hdrs[] = {"Cookie"};
-  server.collectHeaders(hdrs, 1);
+  const char* hdrs[] = {"Cookie", "User-Agent"};
+  server.collectHeaders(hdrs, 2);
   server.begin();
 }
 

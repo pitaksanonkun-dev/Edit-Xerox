@@ -249,7 +249,7 @@
   }
   function status() {
     return {
-      device: { fw: '1.5.1', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
+      device: { fw: '1.5.2', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
         ip: cfg.net.ip, mask: cfg.net.mask, gw: cfg.net.gw, dns: cfg.net.dns, dhcp: cfg.net.dhcp, uptime: uptime(),
         time: now(), heap: 182344 - sessions.length * 9000, interval: cfg.res.interval, onDemand: cfg.res.onDemand, maxRelay: MAX_RELAY, user: cfg.auth.user },
       stats: Object.assign({}, stats),
@@ -258,7 +258,7 @@
         ipv4: h.ipv4, ipv6: h.ipv6, method: h.method, lastSeen: h.lastSeen, ago: h.seenMs ? Math.floor((Date.now() - h.seenMs) / 1000) : -1,
         fails: h.fails, rounds: h.rounds, dnsHits: h.dnsHits, relayPort: h.relayPort, relayJobs: h.relayJobs,
         relayFails: h.relayFails, relayBytes: Math.round(h.relayBytes), relayLast: h.relayLast,
-        status: !h.enabled ? 'disabled' : h.rounds === 0 ? 'pending' : h.fails === 0 ? 'online' : 'offline'
+        status: !h.enabled ? 'disabled' : h.fails === 0 && (h.rounds || h.lastSeen) ? 'online' : h.rounds === 0 ? 'pending' : 'offline'
       })),
       printers: printers.map(p => Object.assign({}, p)),
       sessions: sessions.map(s => ({ client: s.client, host: s.host, target: s.target, port: s.port, bytes: Math.round(s.bytes),
@@ -280,8 +280,10 @@
     const body = opt && opt.body ? JSON.parse(opt.body) : null;
     switch (method + ' ' + u.pathname) {
       case 'GET /api/status': return reply(status());
-      case 'POST /api/login': return ok();
-      case 'POST /api/logout': alert('ออกจากระบบแล้ว (ตัวอย่าง) – บนบอร์ดจริงจะกลับไปหน้าเข้าสู่ระบบ'); return ok();
+      case 'POST /api/login':
+        if (body.user !== cfg.auth.user || body.pass !== cfg.auth.pass) return reply({ ok: false, error: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' }, 401);
+        loggedOut(false); return ok();
+      case 'POST /api/logout': loggedOut(true); return ok();
       case 'POST /api/password': {
         if (body.old !== cfg.auth.pass) return err('รหัสผ่านปัจจุบันไม่ถูกต้อง');
         if (!String(body.user || '').trim()) return err('ชื่อผู้ใช้ต้องมี 1–32 ตัวอักษร');
@@ -373,6 +375,21 @@
       link.click();
     };
   });
+
+  // Logout: like the board, the page is replaced by the login page (LOGIN_PAGE, from WebPage.h)
+  // until the user logs in again. The state survives the reload through sessionStorage.
+  function loggedOut(v) { try { v ? sessionStorage.setItem('xhd-out', '1') : sessionStorage.removeItem('xhd-out'); } catch (e) {} }
+  let out = false;
+  try { out = sessionStorage.getItem('xhd-out') === '1'; } catch (e) {}
+  if (out && typeof LOGIN_PAGE === 'string') {
+    document.addEventListener('DOMContentLoaded', () => {
+      const f = document.createElement('iframe');
+      f.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:0;z-index:99999;background:#f4f6f9';
+      f.srcdoc = LOGIN_PAGE.replace('<script>', '<script>window.fetch=(u,o)=>parent.fetch(u,o);')
+        .replace('location.reload()', 'parent.location.reload()');
+      document.body.appendChild(f);
+    });
+  }
 
   // "Download Backup" link: build the file in the browser
   document.addEventListener('click', ev => {

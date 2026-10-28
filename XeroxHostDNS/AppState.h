@@ -5,7 +5,7 @@
 #include <Arduino.h>
 #include <vector>
 
-#define FW_VERSION      "1.5.1"
+#define FW_VERSION      "1.5.2"
 #define MAX_HOSTS       100
 #define MAX_PRINTERS    32
 #define MAX_V6          4

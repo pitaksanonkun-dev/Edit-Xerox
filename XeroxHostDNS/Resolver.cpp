@@ -585,6 +585,10 @@ void resolverLoop() {
   }
 }
 
+void resolverSeen(int idx, uint32_t ip, const char* method) {
+  if (idx >= 0 && idx < (int)hostState.size()) observe4(idx, ip, method, false);
+}
+
 void resolverPrioritize(int idx) {
   if (idx >= 0 && idx < (int)hostState.size()) hostState[idx].priority = true;
 }

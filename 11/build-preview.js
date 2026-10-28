@@ -5,7 +5,9 @@ const path = require('path');
 
 const src = fs.readFileSync(path.join(__dirname, '..', 'XeroxHostDNS', 'WebPage.h'), 'utf8');
 const html = src.split('INDEX_HTML[] PROGMEM = R"rawliteral(')[1].split(')rawliteral"')[0];
-const mock = fs.readFileSync(path.join(__dirname, 'mock.js'), 'utf8');
+const login = src.split('LOGIN_HTML[] PROGMEM = R"rawliteral(')[1].split(')rawliteral"')[0];
+const mock = 'const LOGIN_PAGE = ' + JSON.stringify(login).replace(/<\//g, '<\\/') + ';\n' +
+  fs.readFileSync(path.join(__dirname, 'mock.js'), 'utf8');
 
 const banner =
   '<div style="background:#fff3df;color:#7a4a00;border-bottom:1px solid #f0d9b0;padding:8px 16px;font-size:13px">' +

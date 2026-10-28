@@ -7,6 +7,7 @@ void resolverBegin();                 // (re)open sockets - call after the netwo
 void resolverStop();
 void resolverLoop();
 void resolverPrioritize(int hostIdx); // refresh this host as soon as possible
+void resolverSeen(int hostIdx, uint32_t ip, const char* method);   // the PC answered at ip (e.g. SMB through the relay)
 // True when the host's IPv4 was confirmed recently enough to use without asking the network
 // (always true when on-demand lookups are switched off).
 bool resolverFresh(int hostIdx);
