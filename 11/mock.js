@@ -12,7 +12,7 @@
     const s = Math.floor((Date.now() - t0) / 1000) + 3 * 86400 + 5 * 3600 + 17 * 60;
     return `${Math.floor(s / 86400)}d ${pad(Math.floor(s / 3600) % 24)}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`;
   };
-  const MAX_HOSTS = 64, MAX_PRINTERS = 32, MAX_RELAY = 6, MAX_SESSIONS = 2;
+  const MAX_HOSTS = 100, MAX_PRINTERS = 32, MAX_RELAY = 100, MAX_SESSIONS = 3;
 
   const cfg = {
     net: { dhcp: false, ip: '192.168.20.10', mask: '255.255.255.0', gw: '192.168.20.1', dns: '192.168.20.5', hostname: 'xerox-dns' },
@@ -203,7 +203,7 @@
       const h = list[i];
       if (h.relayPort) {
         const p = h.relayPort;
-        if ([53, 80, 137, 5353, 5355].includes(p) || p > 65535 || p < 1) return `พอร์ต Relay ${p} ใช้ไม่ได้ (ถูกใช้โดยระบบ)`;
+        if ([53, 80, 137, 5353, 5355, 40445].includes(p) || p > 65535 || p < 1) return `พอร์ต Relay ${p} ใช้ไม่ได้ (ถูกใช้โดยระบบ)`;
         if (list.slice(0, i).some(x => x.relayPort === p)) return 'พอร์ต Relay ซ้ำ: ' + p;
         if (++relaysN > MAX_RELAY) return `เปิด Relay ได้สูงสุด ${MAX_RELAY} Host`;
       }
@@ -249,7 +249,7 @@
   }
   function status() {
     return {
-      device: { fw: '1.3.1', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
+      device: { fw: '1.4.0', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
         ip: cfg.net.ip, mask: cfg.net.mask, gw: cfg.net.gw, dns: cfg.net.dns, dhcp: cfg.net.dhcp, uptime: uptime(),
         time: now(), heap: 182344 - sessions.length * 9000, interval: cfg.res.interval, onDemand: cfg.res.onDemand, maxRelay: MAX_RELAY },
       stats: Object.assign({}, stats),

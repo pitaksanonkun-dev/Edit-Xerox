@@ -1,4 +1,5 @@
 #include "ConfigStore.h"
+#include "PortMux.h"
 #include "Util.h"
 #include <LittleFS.h>
 
@@ -69,16 +70,14 @@ static bool validHostName(const String& n) {
 
 String validateHosts(const std::vector<HostCfg>& list) {
   if (list.size() > MAX_HOSTS) return "จำนวน Host เกิน " + String(MAX_HOSTS);
-  int relays = 0;
   for (size_t i = 0; i < list.size(); i++) {
     const HostCfg& h = list[i];
     if (h.relayPort) {
       uint16_t p = h.relayPort;
-      if (p == 53 || p == 80 || p == 137 || p == 5353 || p == 5355)
+      if (p == 53 || p == 80 || p == 137 || p == 5353 || p == 5355 || p == PORTMUX_PORT)
         return "พอร์ต Relay " + String(p) + " ใช้ไม่ได้ (ถูกใช้โดยระบบ)";
       for (size_t j = 0; j < i; j++)
         if (list[j].relayPort == p) return "พอร์ต Relay ซ้ำ: " + String(p);
-      if (++relays > MAX_RELAY_PORTS) return "เปิด Relay ได้สูงสุด " + String(MAX_RELAY_PORTS) + " Host";
     }
     if (!validHostName(h.name)) return "ชื่อ Host ไม่ถูกต้อง: '" + h.name + "' (ใช้ได้เฉพาะ A-Z 0-9 - _ .)";
     for (size_t j = 0; j < i; j++)

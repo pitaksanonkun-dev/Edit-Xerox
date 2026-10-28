@@ -1,6 +1,7 @@
 #include "Relay.h"
 #include "AppState.h"
 #include "Discovery.h"
+#include "PortMux.h"
 #include "Resolver.h"
 #include "Util.h"
 #include <lwip/sockets.h>
@@ -13,12 +14,8 @@ static const uint32_t CONNECT_TIMEOUT_MS = 4000;
 static const uint32_t RESOLVE_WAIT_MS    = 3000;   // on-demand lookup before connecting to the PC
 static const uint32_t IDLE_TIMEOUT_MS    = 120000;
 
-struct Listener {
-  int fd = -1;
-  uint16_t port = 0;
-  String host;           // host name (looked up again on every connection)
-};
-static Listener lst[MAX_RELAY_PORTS];
+// One listener serves every relay port: PortMux redirects them all to PORTMUX_PORT.
+static int listenFd = -1;
 
 struct Pipe {
   uint8_t buf[RELAY_BUF];
@@ -289,14 +286,22 @@ static bool printerAllowed(uint32_t ip) {
 
 static void connectTarget(Session& s, int idx);
 
-static void startSession(Listener& l, int cfd, const struct sockaddr_in& from) {
+static int relayHostIndex(uint16_t port) {
+  for (size_t i = 0; i < cfg.hosts.size(); i++)
+    if (cfg.hosts[i].relayPort == port) return i;
+  return -1;
+}
+
+static void startSession(int cfd, const struct sockaddr_in& from) {
   Session* s = nullptr;
   for (auto& x : sess) if (!x.used) { s = &x; break; }
   if (!s) { close(cfd); return; }
+  uint16_t port = portMuxOrigPort(from.sin_addr.s_addr, ntohs(from.sin_port));
+  int hi = port ? relayHostIndex(port) : -1;
   s->used = true;
   s->cfd = cfd;
-  s->host = l.host;
-  s->port = l.port;
+  s->host = hi >= 0 ? cfg.hosts[hi].name : String("พอร์ต ") + port;
+  s->port = port;
   s->clientIp = from.sin_addr.s_addr;
   s->client = clientLabel(s->clientIp);
   s->start = s->lastAct = millis();
@@ -304,7 +309,7 @@ static void startSession(Listener& l, int cfd, const struct sockaddr_in& from) {
   setNoDelay(cfd);
 
   if (!printerAllowed(s->clientIp)) { endSession(*s, false, "ปฏิเสธ: ไม่อยู่ในรายการเครื่องพิมพ์"); return; }
-  int idx = hostIndex(l.host);
+  int idx = hostIndex(s->host);
   if (idx < 0 || !cfg.hosts[idx].enabled) { endSession(*s, false, "Host ถูกลบหรือปิดใช้งาน"); return; }
   if (!resolverFresh(idx)) {          // on-demand: ask the network where the PC is now, then connect
     s->resolving = true;
@@ -397,49 +402,48 @@ static void serviceSession(Session& s) {
 }
 
 // ---- Public API ------------------------------------------------------------
-static void closeListeners() {
-  for (auto& l : lst) {
-    if (l.fd >= 0) close(l.fd);
-    l = Listener();
+static void closeListener() {
+  if (listenFd >= 0) close(listenFd);
+  listenFd = -1;
+}
+
+static bool openListener() {
+  int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  if (fd < 0) { Serial.println("[RELAY] no socket for the listener"); return false; }
+  int one = 1;
+  setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
+  struct sockaddr_in a = {};
+  a.sin_family = AF_INET;
+  a.sin_port = htons(PORTMUX_PORT);
+  a.sin_addr.s_addr = htonl(INADDR_ANY);
+  if (bind(fd, (struct sockaddr*)&a, sizeof(a)) < 0 || listen(fd, 4) < 0) {
+    Serial.printf("[RELAY] cannot listen on port %u (errno %d)\n", PORTMUX_PORT, errno);
+    close(fd);
+    return false;
   }
+  setNonBlock(fd);
+  listenFd = fd;
+  return true;
 }
 
 void relayBegin() {
-  closeListeners();
-  if (!g_netReady) return;
-  int k = 0;
-  for (auto& h : cfg.hosts) {
-    if (!h.enabled || !h.relayPort || k >= MAX_RELAY_PORTS) continue;
-    int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (fd < 0) { Serial.printf("[RELAY] no socket for port %u\n", h.relayPort); break; }
-    int one = 1;
-    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
-    struct sockaddr_in a = {};
-    a.sin_family = AF_INET;
-    a.sin_port = htons(h.relayPort);
-    a.sin_addr.s_addr = htonl(INADDR_ANY);
-    if (bind(fd, (struct sockaddr*)&a, sizeof(a)) < 0 || listen(fd, 2) < 0) {
-      Serial.printf("[RELAY] cannot listen on port %u (errno %d)\n", h.relayPort, errno);
-      close(fd);
-      continue;
-    }
-    setNonBlock(fd);
-    lst[k].fd = fd;
-    lst[k].port = h.relayPort;
-    lst[k].host = h.name;
-    Serial.printf("[RELAY] port %u -> %s:%u\n", h.relayPort, h.name.c_str(), RELAY_TARGET_PORT);
-    k++;
-  }
+  std::vector<uint16_t> ports;
+  for (auto& h : cfg.hosts)
+    if (h.enabled && h.relayPort) ports.push_back(h.relayPort);
+  portMuxSetPorts(ports);
+  if (!g_netReady || ports.empty() || !portMuxBegin()) { closeListener(); return; }
+  if (listenFd < 0 && !openListener()) return;
+  Serial.printf("[RELAY] %u relay ports -> PC:%u\n", (unsigned)ports.size(), RELAY_TARGET_PORT);
 }
 
 void relayStop() {
-  closeListeners();
+  portMuxSetPorts({});
+  closeListener();
   for (auto& s : sess) if (s.used) endSession(s, false, "เครือข่ายหลุด");
 }
 
 bool relayListening(uint16_t port) {
-  for (auto& l : lst) if (l.fd >= 0 && l.port == port) return true;
-  return false;
+  return listenFd >= 0 && portMuxHas(port);
 }
 
 bool relayBusy() {
@@ -448,15 +452,13 @@ bool relayBusy() {
 }
 
 void relayLoop() {
-  for (auto& l : lst) {
-    if (l.fd < 0) continue;
-    bool free = false;
-    for (auto& s : sess) if (!s.used) free = true;
-    if (!free) break;                     // leave the connection in the backlog until a slot frees up
+  bool free = false;
+  for (auto& s : sess) if (!s.used) free = true;
+  if (listenFd >= 0 && free) {            // otherwise leave the connection in the backlog until a slot frees up
     struct sockaddr_in from;
     socklen_t fl = sizeof(from);
-    int cfd = accept(l.fd, (struct sockaddr*)&from, &fl);
-    if (cfd >= 0) startSession(l, cfd, from);
+    int cfd = accept(listenFd, (struct sockaddr*)&from, &fl);
+    if (cfd >= 0) startSession(cfd, from);
   }
   for (auto& s : sess) if (s.used) serviceSession(s);
 }

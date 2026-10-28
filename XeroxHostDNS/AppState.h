@@ -5,14 +5,15 @@
 #include <Arduino.h>
 #include <vector>
 
-#define FW_VERSION      "1.3.1"
-#define MAX_HOSTS       64
+#define FW_VERSION      "1.4.0"
+#define MAX_HOSTS       100
 #define MAX_PRINTERS    32
 #define MAX_V6          4
-// lwIP in Arduino-ESP32 has 16 sockets in total. Base usage: DNS 1, resolver 2,
-// web 2, printer check 1 = 6. Relay: listeners + 2 sockets per session = 10.
-#define MAX_RELAY_PORTS     6
-#define MAX_RELAY_SESSIONS  2
+// lwIP in Arduino-ESP32 has 16 sockets in total. Base usage: DNS 1, resolver 2, web 2,
+// printer check 1, verify probe 1, short UDP lookups 1 = 8. Relay: 1 listener for all
+// relay ports (PortMux) + 2 sockets per session = 7.
+#define MAX_RELAY_PORTS     MAX_HOSTS
+#define MAX_RELAY_SESSIONS  3
 #define RELAY_TARGET_PORT   445
 
 // ---- Persistent configuration (stored in /config.json on LittleFS) --------

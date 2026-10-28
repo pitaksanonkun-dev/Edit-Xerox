@@ -24,10 +24,23 @@ static bool auth() {
   return false;
 }
 
+// Streams the JSON in 1 KB pieces: with 100 hosts /api/status is too large to copy into a String.
+class ChunkOut : public Print {
+ public:
+  size_t write(uint8_t c) override { buf[n++] = c; if (n == sizeof(buf)) flush(); return 1; }
+  size_t write(const uint8_t* d, size_t len) override { for (size_t i = 0; i < len; i++) write(d[i]); return len; }
+  void flush() override { if (n) server.sendContent((const char*)buf, n); n = 0; }
+ private:
+  uint8_t buf[1024];
+  size_t n = 0;
+};
+
 static void sendJson(JsonDocument& doc, int code = 200) {
-  String out;
+  server.setContentLength(measureJson(doc));
+  server.send(code, "application/json", "");
+  ChunkOut out;
   serializeJson(doc, out);
-  server.send(code, "application/json", out);
+  out.flush();
 }
 
 static void sendOk(bool reboot = false) {
