@@ -392,6 +392,73 @@ void resolverOnMac(const uint8_t* mac, uint32_t ip, const char* method) {
     if (cfg.hosts[i].enabled && hostMac(i, m) && memcmp(m, mac, 6) == 0) observe4(i, ip, method, false);
 }
 
+// ---- Own name: http://<hostname>/ (NetBIOS) and http://<hostname>.local/ (mDNS) -------
+// Lets a PC open the web UI without knowing the board's IP (e.g. after a DHCP fallback).
+static String ownLabel() {
+  String h = cfg.net.hostname;
+  int dot = h.indexOf('.');
+  return dot > 0 ? h.substring(0, dot) : h;
+}
+
+static void answerNbns(const uint8_t* p, int len, const struct sockaddr_in& from) {
+  if (len < 12 + 34 + 4 || (p[2] & 0x80) || ((p[2] >> 3) & 0x0f) != 0) return;   // name queries only
+  if (((p[4] << 8) | p[5]) != 1 || p[12] != 0x20) return;
+  char nb[16]; uint8_t suffix;
+  if (!nbDecode((const char*)p + 13, nb, &suffix) || (suffix != 0x00 && suffix != 0x20)) return;
+  String me = ownLabel();
+  if (me.length() > 15) me = me.substring(0, 15);
+  if (!me.equalsIgnoreCase(nb) || ((p[12 + 34] << 8) | p[12 + 35]) != 0x20) return;
+  uint8_t r[12 + 34 + 16];
+  memset(r, 0, sizeof(r));
+  r[0] = p[0]; r[1] = p[1];
+  r[2] = 0x85; r[3] = 0x00;                           // response, authoritative
+  r[7] = 1;                                           // one answer
+  memcpy(r + 12, p + 12, 34);                         // the queried name
+  uint8_t* a = r + 12 + 34;
+  a[1] = 0x20; a[3] = 0x01;                           // NB, IN
+  a[6] = 0x01; a[7] = 0x2c;                           // TTL 300
+  a[9] = 6;                                           // flags (unique, B-node) + IPv4
+  memcpy(a + 12, &g_myIp, 4);
+  udpSend(sNb, from.sin_addr.s_addr, ntohs(from.sin_port), r, sizeof(r));
+}
+
+static void answerMdns(const uint8_t* p, int len, const struct sockaddr_in& from) {
+  if (len < 12 || (p[2] & 0x80)) return;              // queries only
+  int qd = (p[4] << 8) | p[5], o = 12;
+  String me = ownLabel() + ".local";
+  char name[256];
+  for (int i = 0; i < qd; i++) {
+    o = dnsReadName(p, len, o, name, sizeof(name));
+    if (o < 0 || o + 4 > len) return;
+    uint16_t type = (p[o] << 8) | p[o + 1];
+    bool unicast = p[o + 2] & 0x80;                   // QU bit
+    o += 4;
+    if (!me.equalsIgnoreCase(name) || (type != 1 && type != 255)) continue;
+    String lbl = ownLabel();
+    if (lbl.length() > 63) return;
+    uint8_t r[128];
+    int n = 12;
+    memset(r, 0, 12);
+    bool legacy = ntohs(from.sin_port) != 5353;       // one-shot resolver: echo the id
+    if (legacy) { r[0] = p[0]; r[1] = p[1]; }
+    r[2] = 0x84;                                      // response, authoritative
+    r[7] = 1;
+    r[n++] = lbl.length(); memcpy(r + n, lbl.c_str(), lbl.length()); n += lbl.length();
+    r[n++] = 5; memcpy(r + n, "local", 5); n += 5; r[n++] = 0;
+    if (legacy) {                                     // repeat the question, answer points to it
+      r[5] = 1;
+      uint8_t q[] = {0x00, 0x01, 0x00, 0x01, 0xC0, 0x0C};
+      memcpy(r + n, q, sizeof(q)); n += sizeof(q);
+    }
+    uint8_t rr[] = {0x00, 0x01, (uint8_t)(legacy ? 0x00 : 0x80), 0x01, 0, 0, 0, 120, 0, 4};
+    memcpy(r + n, rr, sizeof(rr)); n += sizeof(rr);
+    memcpy(r + n, &g_myIp, 4); n += 4;
+    if (legacy || unicast) udpSend(sMd, from.sin_addr.s_addr, ntohs(from.sin_port), r, n);
+    else udpSend(sMd, inet_addr(MDNS_GROUP), 5353, r, n);
+    return;
+  }
+}
+
 static void drain(int s) {
   if (s < 0) return;
   for (int i = 0; i < 16; i++) {
@@ -402,8 +469,8 @@ static void drain(int s) {
     if (from.sin_addr.s_addr == g_myIp) continue;   // our own multicast/broadcast
     uint16_t sport = ntohs(from.sin_port);
     if (sport == 5355) handleDnsStyle(pkt, n, M_LLMNR);
-    else if (s == sMd || sport == 5353) handleDnsStyle(pkt, n, M_MDNS);
-    else handleNbns(pkt, n, from.sin_addr.s_addr);
+    else if (s == sMd || sport == 5353) { if (s == sMd) answerMdns(pkt, n, from); handleDnsStyle(pkt, n, M_MDNS); }
+    else { answerNbns(pkt, n, from); handleNbns(pkt, n, from.sin_addr.s_addr); }
   }
 }
 

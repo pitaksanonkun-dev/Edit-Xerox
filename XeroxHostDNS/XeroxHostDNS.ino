@@ -26,6 +26,8 @@
 #include "Discovery.h"
 #include "HostDns.h"
 #include "LogStore.h"
+#include "NetGuard.h"
+#include "PortMux.h"
 #include "PrinterMon.h"
 #include "Relay.h"
 #include "Resolver.h"
@@ -121,6 +123,7 @@ static void checkNetwork() {
   if (g_netReady) {
     Serial.printf("[ETH] IP %s mask %s gw %s dns %s\n", ip4Str(ip).c_str(), ip4Str(g_myMask).c_str(),
                   ip4Str((uint32_t)ETH.gatewayIP()).c_str(), ip4Str((uint32_t)ETH.dnsIP()).c_str());
+    portMuxBegin();
     dnsBegin();
     resolverBegin();
     relayBegin();
@@ -152,6 +155,7 @@ void setup() {
 
 void loop() {
   checkNetwork();
+  netGuardLoop();
   if (g_netReady) {
     relayLoop();
     dnsLoop();

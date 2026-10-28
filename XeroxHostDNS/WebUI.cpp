@@ -5,6 +5,7 @@
 #include "Discovery.h"
 #include "HostDns.h"
 #include "LogStore.h"
+#include "NetGuard.h"
 #include "PrinterMon.h"
 #include "Relay.h"
 #include "Resolver.h"
@@ -181,6 +182,9 @@ static void handleStatus() {
   dev["gw"] = ip4Str((uint32_t)ETH.gatewayIP());
   dev["dns"] = ip4Str((uint32_t)ETH.dnsIP());
   dev["dhcp"] = cfg.net.dhcp;
+  dev["netFallback"] = netGuardFallback();
+  dev["netReason"] = netGuardReason();
+  dev["ipConflict"] = netGuardConflict();
   dev["uptime"] = uptimeStr();
   dev["time"] = timeValid() ? nowStr() : String("");
   dev["heap"] = ESP.getFreeHeap();

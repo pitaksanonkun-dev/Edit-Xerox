@@ -142,9 +142,11 @@ dialog form{padding:16px 18px;max-height:90vh;overflow:auto}
   <div class="chk"><input type="checkbox" id="s_dhcp"><span>รับ IP อัตโนมัติ (DHCP)</span></div>
   <div class="hint">IP ของ ESP32 ต้องคงที่ เพราะเครื่อง Xerox ส่งงานมาที่ IP นี้ (Relay) หรือถาม DNS ที่ IP นี้ · เลือกได้ 2 แบบ: ตั้ง Static IP ที่นี่ หรือเปิด DHCP ไว้แล้วจอง IP ใน Router (แนะนำถ้า Switch เปิด DHCP Snooping / Dynamic ARP Inspection)</div>
   <div class="hint" id="netAuto" style="display:none;color:var(--ok)"></div>
+  <div class="chk"><input type="checkbox" id="s_autoFallback"><span><b>ถ้าย้ายไปเสียบวงอื่น ให้ใช้ DHCP แทนชั่วคราว (แนะนำ)</b> – ทุกครั้งที่เสียบสาย ESP32 ตรวจว่ามี Gateway หรืออุปกรณ์ในวงของ Static IP ตอบภายใน 90 วินาที ถ้าไม่มีจะใช้ DHCP จนกว่าจะรีบูต (ค่า Static ยังเก็บไว้) แล้วเปิดหน้าเว็บได้ที่ <span class="mono">http://ชื่ออุปกรณ์/</span> หรือ ESP32Finder</span></div>
+  <div class="chk"><input type="checkbox" id="s_conflictFallback"><span>ถ้ามีอุปกรณ์อื่นใช้ IP ซ้ำ ให้เปลี่ยนไปใช้ DHCP ด้วย – <b>ไม่แนะนำ</b>: ถ้าปิดไว้ ESP32 จะใช้ IP เดิมต่อและแจ้งเตือนพร้อม MAC ของเครื่องที่ชน (ไม่ย้าย IP ไปมา และ Xerox ยังส่งมาที่ IP เดิม)</span></div>
   <div class="f2"><div><label>IP Address</label><input type="text" id="s_ip"><div class="hint">กรอกเอง: IP ที่ว่างในวงนี้ และอยู่นอกช่วงที่ Router แจก DHCP</div></div><div><label>Subnet Mask</label><input type="text" id="s_mask"></div>
   <div><label>Gateway</label><input type="text" id="s_gw"></div><div><label>DNS ของ ESP32 เอง</label><input type="text" id="s_dns"><div class="hint">แนะนำให้ใส่: ใช้ซิงก์เวลา (NTP) ให้ Log และเป็น DNS ต้นทางเมื่อช่อง Upstream DNS ว่าง · ใส่ DNS เดียวกับเครื่อง PC ในสำนักงาน (DNS ของ AD / Router) · ห้ามใส่ IP ของ ESP32 เอง</div></div>
-  <div><label>ชื่ออุปกรณ์ (hostname)</label><input type="text" id="s_hostname"></div></div></div>
+  <div><label>ชื่ออุปกรณ์ (hostname)</label><input type="text" id="s_hostname" maxlength="15"><div class="hint">เปิดหน้าเว็บด้วยชื่อได้โดยไม่ต้องรู้ IP: <span class="mono">http://ชื่อนี้/</span> หรือ <span class="mono">http://ชื่อนี้.local/</span> (PC ในวง LAN เดียวกัน) · ใช้ a-z 0-9 - ไม่เกิน 15 ตัว</div></div></div></div>
  <div class="card"><h2>DNS Server</h2><div class="f2">
   <div><label>Upstream DNS 1 (เว้นว่าง = ใช้ค่าจาก DHCP)</label><input type="text" id="s_upstream1"><div class="hint">ควรเป็น DNS เดิมของบริษัท เช่น Domain Controller</div></div>
   <div><label>Upstream DNS 2</label><input type="text" id="s_upstream2"></div>
@@ -203,11 +205,13 @@ function render(){const d=S.device,st=S.stats;$('#acctName').textContent=$('#acc
  $('#intv').textContent=(d.onDemand?'ค้นหา IP เมื่อ Xerox ส่งงาน · ตรวจเบื้องหลังทุก ':'ตรวจหา IP อัตโนมัติทุก ')+fmtIntv(d.interval)+' · รับฟังการประกาศชื่อจาก PC ตลอดเวลา';
  $('#hdr').textContent=`IP ${d.ip||'-'} · ${d.link?'Link '+d.speed+'Mbps':'สายแลนไม่เชื่อมต่อ'} · ${d.time||'uptime '+d.uptime} · v${d.fw}`;
  $('#dnsNote').innerHTML=`<b>โหมด Relay (แนะนำ):</b> ใน Xerox เลือก Address Type = <b>IPv4 Address</b> ใส่ IP <b class="ip">${esc(d.ip)}</b> และ Port ตามคอลัมน์ "Relay" ของแต่ละ Host<br>`+
-  `<b>โหมด DNS:</b> ตั้ง DNS Server ของ Xerox เป็น <b class="ip">${esc(d.ip)}</b> แล้วใช้ Address Type = Host Name`+(d.dhcp?' <span class="b warn">ESP32 ใช้ DHCP อยู่ – แนะนำตั้ง Static IP</span>':'');
+  `<b>โหมด DNS:</b> ตั้ง DNS Server ของ Xerox เป็น <b class="ip">${esc(d.ip)}</b> แล้วใช้ Address Type = Host Name`+(d.dhcp?' <span class="b warn">ESP32 ใช้ DHCP อยู่ – แนะนำตั้ง Static IP</span>':'')+
+  (d.netFallback?`<div style="margin-top:6px;color:var(--bad)"><b>⚠ ใช้ DHCP สำรองอยู่ (IP ตอนนี้ ${esc(d.ip)})</b> – ${esc(d.netReason)} · Xerox ที่ตั้งไว้เป็น IP เดิมจะส่งไม่ได้ ให้แก้ Static IP ในแท็บ ตั้งค่า ให้ตรงวงนี้ หรือย้ายกลับวงเดิมแล้วรีบูต</div>`:'')+
+  (d.ipConflict&&!d.netFallback?`<div style="margin-top:6px;color:var(--bad)"><b>⚠ IP ${esc(d.ip)} ชนกับอุปกรณ์ MAC ${esc(d.ipConflict)}</b> – ให้เครื่องนั้นเปลี่ยน IP (ESP32 ยังใช้ IP เดิม) แล้วรีบูต ESP32 เพื่อตรวจใหม่</div>`:'');
  const hOn=S.hosts.filter(h=>h.status==='online').length,pOn=S.printers.filter(p=>p.online).length,jobs=S.hosts.reduce((a,h)=>a+h.relayJobs,0);
  $('#kpis').innerHTML=[[`${hOn}/${S.hosts.length}`,'Host ที่พบ IP'],[`${pOn}/${S.printers.length}`,'เครื่องพิมพ์ออนไลน์'],[jobs,'งานที่ส่งผ่าน Relay'],[S.sessions.length,'กำลังส่งตอนนี้'],[st.local,'คำตอบ DNS ชื่อ Host'],[d.uptime,'Uptime']]
   .map(k=>`<div class="card kpi"><div class="v">${esc(k[0])}</div><div class="l">${k[1]}</div></div>`).join('');
- $('#devTbl').innerHTML=[['IP / Mask',`${d.ip} / ${d.mask}`],['Gateway',d.gw],['DNS ของ ESP32',d.dns],['MAC',d.mac],['ชื่ออุปกรณ์',d.hostname],['โหมด IP',d.dhcp?'DHCP':'Static'],['ลิงก์',d.link?`${d.speed} Mbps ${d.duplex}`:'ไม่เชื่อมต่อ'],['หน่วยความจำว่าง',d.heap+' bytes'],['DNS query ทั้งหมด',`${st.queries} (ปฏิเสธ ${st.refused}, ล้มเหลว ${st.failed})`]]
+ $('#devTbl').innerHTML=[['IP / Mask',`${d.ip} / ${d.mask}`],['Gateway',d.gw],['DNS ของ ESP32',d.dns],['MAC',d.mac],['ชื่ออุปกรณ์',d.hostname],['โหมด IP',d.dhcp?'DHCP':d.netFallback?'DHCP สำรอง (Static ใช้ไม่ได้ในวงนี้)':'Static'],['ลิงก์',d.link?`${d.speed} Mbps ${d.duplex}`:'ไม่เชื่อมต่อ'],['หน่วยความจำว่าง',d.heap+' bytes'],['DNS query ทั้งหมด',`${st.queries} (ปฏิเสธ ${st.refused}, ล้มเหลว ${st.failed})`]]
   .map(r=>`<tr><th style="width:200px">${r[0]}</th><td class="mono">${esc(r[1])}</td></tr>`).join('');
  $('#hostRows').innerHTML=S.hosts.length?S.hosts.map((h,i)=>`<tr><td>${h.scanName?`<b>${esc(h.scanName)}</b>`:'<span class="b mut">ยังไม่มีชื่อ Scan – กด แก้ไข</span>'}<div class="sm">Host: <span class="mono" style="color:var(--fg)">${esc(h.name)}</span></div>${h.mac?`<div class="sm mono">MAC ${esc(h.mac)}</div>`:''}${h.aliases?`<div class="sm">ชื่อแฝง: ${esc(h.aliases)}</div>`:''}${h.note?`<div class="sm">${esc(h.note)}</div>`:''}</td>
   <td>${badge(h.status)}${h.fails>1?`<div class="sm">ไม่ตอบ ${h.fails} รอบ</div>`:''}</td>
@@ -362,7 +366,7 @@ function dlHistory(){const n=$('#hDay').value;if(n)location.href='/api/logs/file
 async function testName(){const n=$('#testName').value.trim();if(!n)return;const r=await api('/api/test?name='+encodeURIComponent(n));
  $('#testOut').innerHTML=r.match?`ตรงกับ Host <b>${esc(r.match)}</b> → IPv4 <b class="mono">${esc(r.ipv4||'ยังไม่ทราบ')}</b> (${r.status==='online'?'ออนไลน์':'ยังไม่พบในรอบล่าสุด'})`:'ไม่ตรงกับ Host ใดในรายการ — คำถามนี้จะถูกส่งต่อไปยัง Upstream DNS'}
 
-const SF={net:['dhcp','ip','mask','gw','dns','hostname'],dns:['upstream1','upstream2','ttl','domain','anySuffix','answerAAAA','restrict'],
+const SF={net:['dhcp','ip','mask','gw','dns','hostname','autoFallback','conflictFallback'],dns:['upstream1','upstream2','ttl','domain','anySuffix','answerAAAA','restrict'],
  res:['onDemand','interval','timeoutMs','extraBcast','nbns','llmnr','mdns','passive','scanSubnets','dnsLookup'],time:['tz','ntp']};
 async function loadSettings(){try{C=await api('/api/config')}catch(e){toast(e.message);return}
  for(const g in SF)SF[g].forEach(k=>{const e=$('#s_'+k);if(!e)return;const v=C[g]?.[k];if(e.type==='checkbox')e.checked=!!v;else e.value=v??''});togDhcp()}

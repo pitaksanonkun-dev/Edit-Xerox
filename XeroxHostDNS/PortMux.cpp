@@ -1,5 +1,6 @@
 #include "PortMux.h"
 #include "AppState.h"
+#include "NetGuard.h"
 #include <algorithm>
 #include <lwip/netif.h>
 #include <lwip/pbuf.h>
@@ -68,6 +69,11 @@ static uint16_t lookup(uint32_t ip, uint16_t peer) {               // call with 
 // Copier -> ESP32: <relay port> becomes PORTMUX_PORT.
 static err_t muxInput(struct pbuf* p, struct netif* inp) {
   uint8_t* e = (uint8_t*)p->payload;
+  if (p->len >= 14 + 28 && e[12] == 0x08 && e[13] == 0x06) {     // ARP: sender MAC / IP for NetGuard
+    uint32_t spa;
+    memcpy(&spa, e + 28, 4);
+    netGuardOnArp(e + 22, spa);
+  }
   if (p->len >= 14 + 40 && e[12] == 0x08 && e[13] == 0x00) {
     uint8_t* ip = e + 14;
     uint8_t* t = tcpHeader(ip, p->len - 14);
