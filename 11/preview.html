@@ -405,7 +405,7 @@ dialog form{padding:16px 18px;max-height:90vh;overflow:auto}
   }
   function status() {
     return {
-      device: { fw: '1.5.0', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
+      device: { fw: '1.5.1', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
         ip: cfg.net.ip, mask: cfg.net.mask, gw: cfg.net.gw, dns: cfg.net.dns, dhcp: cfg.net.dhcp, uptime: uptime(),
         time: now(), heap: 182344 - sessions.length * 9000, interval: cfg.res.interval, onDemand: cfg.res.onDemand, maxRelay: MAX_RELAY, user: cfg.auth.user },
       stats: Object.assign({}, stats),
@@ -797,15 +797,21 @@ async function importCsv(inp){const f=inp.files[0];inp.value='';if(!f)return;
   const col=(r,...n)=>{for(const k of n){const i=H.indexOf(k.toLowerCase());if(i>=0&&(r[i]||'').trim())return r[i].trim()}return''};
   const my=S.device.ip,byKey=new Map();IMP=[];
   for(const r of rows.slice(1)){const addr=col(r,'ScanServerAddress');if(!addr)continue;
-   const nick=col(r,'ScanNickName','DisplayName','FirstName')||addr,port=Number(col(r,'ScanServerPort'))||445,ip=isIp(addr),relay=addr===my?port:0;
-   const ex=relay?S.hosts.findIndex(h=>h.relayPort===relay):ip?S.hosts.findIndex(h=>h.fallback4===addr||h.ipv4===addr):S.hosts.findIndex(h=>h.name.toLowerCase()===addr.toLowerCase());
-   const info={nick,display:col(r,'DisplayName'),share:col(r,'ScanSMBShare'),login:col(r,'ScanLoginName'),addr:addr+':'+port};
-   const key=ex>=0?'h'+ex:relay?'p'+relay:addr.toLowerCase();
+   // blank ScanServerPort = give the entry a relay port (generated below)
+   const nick=col(r,'ScanNickName','DisplayName','FirstName')||addr,raw=col(r,'ScanServerPort'),port=Number(raw)||0,ip=isIp(addr),mine=addr===my,relay=mine?port:0;
+   const ex=relay?S.hosts.findIndex(h=>h.relayPort===relay)
+    :mine?S.hosts.findIndex(h=>h.scanName.split(',').some(x=>x.trim().toLowerCase()===nick.toLowerCase()))
+    :ip?S.hosts.findIndex(h=>h.fallback4===addr||h.ipv4===addr):S.hosts.findIndex(h=>h.name.toLowerCase()===addr.toLowerCase());
+   const info={nick,display:col(r,'DisplayName'),share:col(r,'ScanSMBShare'),login:col(r,'ScanLoginName'),addr:addr+':'+(raw?port:'(ว่าง)')};
+   const key=ex>=0?'h'+ex:relay?'p'+relay:mine?'n'+nick.toLowerCase():addr.toLowerCase();
    if(byKey.has(key)){byKey.get(key).src.push(info);continue}
+   const old=ex>=0?S.hosts[ex].relayPort:0;
    const e={ex,relay,src:[info],on:true,name:ex>=0?S.hosts[ex].name:cleanName(ip?nick:addr),nameSure:ex>=0||!ip,
-    mac:ex>=0?S.hosts[ex].mac:'',fallback4:ip&&!relay?addr:'',port:relay||(ex>=0?S.hosts[ex].relayPort:0)||''};
+    mac:ex>=0?S.hosts[ex].mac:'',fallback4:ip&&!mine?addr:'',port:relay||old||'',gen:!raw&&!old};
    byKey.set(key,e);IMP.push(e)}
   if(!IMP.length)throw new Error('ไม่พบรายการ Scan ที่มี ScanServerAddress');
+  const used=new Set([...S.hosts.map(h=>h.relayPort),...IMP.map(e=>Number(e.port))].filter(Boolean));
+  IMP.forEach(e=>{if(!e.gen)return;let p=4451;while(used.has(p))p++;used.add(p);e.port=String(p)});
   IMP.forEach(e=>{e.scan=e.src.map(x=>x.nick).filter((v,i,a)=>a.indexOf(v)===i).join(', ');
    if(e.ex>=0){const h=S.hosts[e.ex];e.same=mergeScan(h.scanName,e.scan)===h.scanName&&(!e.port||Number(e.port)===h.relayPort);e.on=!e.same}});
   showImport(f.name)}
@@ -813,7 +819,7 @@ async function importCsv(inp){const f=inp.files[0];inp.value='';if(!f)return;
 function showImport(fname){
  customDialog('เพิ่ม Host จากไฟล์ CSV (Address Book ของ Xerox)','min(1180px,97vw)','เพิ่ม / อัปเดตรายการที่เลือก',
   `<div class="hint" style="margin-bottom:6px">ไฟล์ <b>${esc(fname)}</b> · ${IMP.length} รายการ · ตรวจ <b>Host Name</b> ให้เป็น Computer name ของ Windows (หรือใส่ MAC แทน) ·
-  รายการที่ชี้มาที่ ESP32 (<span class="mono">${esc(S.device.ip)}</span>) ใช้พอร์ตในไฟล์เป็นพอร์ต Relay · ไม่นำเข้ารหัสผ่าน</div>
+  รายการที่ชี้มาที่ ESP32 (<span class="mono">${esc(S.device.ip)}</span>) ใช้พอร์ตในไฟล์เป็นพอร์ต Relay · <b>ScanServerPort ว่าง</b> = สร้างพอร์ต Relay ให้ (4451 ขึ้นไปที่ยังว่าง) แล้วใน Xerox ตั้งปลายทางเป็น <span class="mono">${esc(S.device.ip)}</span> : พอร์ตนั้น · ไม่นำเข้ารหัสผ่าน</div>
   <div class="bar" style="margin-bottom:6px"><span class="sm">ต่อท้ายชื่อ Scan ด้วยชื่อเครื่อง Xerox:</span><select id="impPrn" class="btn s"><option value="">(ไม่ต่อท้าย)</option>${S.printers.map(p=>`<option>${esc(p.name)}</option>`).join('')}</select>
   <button type="button" class="btn s" onclick="impAutoPort()">ให้พอร์ต Relay อัตโนมัติกับแถวที่ยังว่าง</button></div>
   <div class="tw imp"><table><thead><tr><th></th><th>ชื่อ Scan (จากไฟล์)</th><th>ปลายทางในไฟล์</th><th>Share / ผู้ใช้</th><th>Host Name *</th><th>MAC (ถ้ามี)</th><th>พอร์ต Relay</th><th>ผล</th></tr></thead><tbody id="impRows"></tbody></table></div>
@@ -827,7 +833,7 @@ function renderImp(){$('#impRows').innerHTML=IMP.map((e,i)=>{const h=e.ex>=0?S.h
   <td class="sm">${e.src.map(x=>esc(x.share+(x.login?' / '+x.login:''))).join('<br>')}</td>
   <td><input type="text" value="${esc(e.name)}" ${h?'disabled':''} oninput="IMP[${i}].name=this.value.trim()">${!h&&!e.nameSure?'<div class="sm" style="color:var(--warn)">ไฟล์ไม่มีชื่อเครื่อง – ตรวจ/แก้ หรือใส่ MAC</div>':''}</td>
   <td><input type="text" value="${esc(e.mac)}" placeholder="AA:BB:CC:DD:EE:FF" ${h?'disabled':''} oninput="IMP[${i}].mac=this.value.trim()"></td>
-  <td><input type="text" value="${esc(e.port)}" style="width:80px;min-width:0" ${e.relay?'disabled':''} oninput="IMP[${i}].port=this.value.trim()"></td><td>${res}</td></tr>`}).join('')}
+  <td><input type="text" value="${esc(e.port)}" style="width:80px;min-width:0" ${e.relay?'disabled':''} oninput="IMP[${i}].port=this.value.trim()">${e.gen?'<div class="sm" style="color:var(--ok)">สร้างให้อัตโนมัติ</div>':''}</td><td>${res}</td></tr>`}).join('')}
 function impAutoPort(){const used=new Set([...S.hosts.map(h=>h.relayPort),...IMP.map(e=>Number(e.port))].filter(Boolean));
  IMP.forEach(e=>{if(!e.on||e.port)return;let p=4451;while(used.has(p))p++;used.add(p);e.port=String(p)});renderImp()}
 async function applyImport(){const l=hostCfg(),sel=IMP.filter(e=>e.on),prn=$('#impPrn').value;
