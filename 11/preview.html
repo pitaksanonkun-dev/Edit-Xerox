@@ -99,9 +99,10 @@ dialog form{padding:16px 18px;max-height:90vh;overflow:auto}
 <form id="setForm" onsubmit="saveSettings(event)">
  <div class="card"><h2>เครือข่ายของ ESP32</h2>
   <div class="chk"><input type="checkbox" id="s_dhcp"><span>รับ IP อัตโนมัติ (DHCP)</span></div>
-  <div class="hint">แนะนำให้ใช้ Static IP หรือจอง IP ใน DHCP เพราะเครื่อง Xerox ต้องชี้ DNS มาที่ IP นี้ตลอด</div>
-  <div class="f2"><div><label>IP Address</label><input type="text" id="s_ip"></div><div><label>Subnet Mask</label><input type="text" id="s_mask"></div>
-  <div><label>Gateway</label><input type="text" id="s_gw"></div><div><label>DNS ของ ESP32 เอง</label><input type="text" id="s_dns"></div>
+  <div class="hint">IP ของ ESP32 ต้องคงที่ เพราะเครื่อง Xerox ส่งงานมาที่ IP นี้ (Relay) หรือถาม DNS ที่ IP นี้ · เลือกได้ 2 แบบ: ตั้ง Static IP ที่นี่ หรือเปิด DHCP ไว้แล้วจอง IP ใน Router (แนะนำถ้า Switch เปิด DHCP Snooping / Dynamic ARP Inspection)</div>
+  <div class="hint" id="netAuto" style="display:none;color:var(--ok)"></div>
+  <div class="f2"><div><label>IP Address</label><input type="text" id="s_ip"><div class="hint">กรอกเอง: IP ที่ว่างในวงนี้ และอยู่นอกช่วงที่ Router แจก DHCP</div></div><div><label>Subnet Mask</label><input type="text" id="s_mask"></div>
+  <div><label>Gateway</label><input type="text" id="s_gw"></div><div><label>DNS ของ ESP32 เอง</label><input type="text" id="s_dns"><div class="hint">แนะนำให้ใส่: ใช้ซิงก์เวลา (NTP) ให้ Log และเป็น DNS ต้นทางเมื่อช่อง Upstream DNS ว่าง · ใส่ DNS เดียวกับเครื่อง PC ในสำนักงาน (DNS ของ AD / Router) · ห้ามใส่ IP ของ ESP32 เอง</div></div>
   <div><label>ชื่ออุปกรณ์ (hostname)</label><input type="text" id="s_hostname"></div></div></div>
  <div class="card"><h2>DNS Server</h2><div class="f2">
   <div><label>Upstream DNS 1 (เว้นว่าง = ใช้ค่าจาก DHCP)</label><input type="text" id="s_upstream1"><div class="hint">ควรเป็น DNS เดิมของบริษัท เช่น Domain Controller</div></div>
@@ -394,7 +395,7 @@ dialog form{padding:16px 18px;max-height:90vh;overflow:auto}
   }
   function status() {
     return {
-      device: { fw: '1.3.0', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
+      device: { fw: '1.3.1', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
         ip: cfg.net.ip, mask: cfg.net.mask, gw: cfg.net.gw, dns: cfg.net.dns, dhcp: cfg.net.dhcp, uptime: uptime(),
         time: now(), heap: 182344 - sessions.length * 9000, interval: cfg.res.interval, onDemand: cfg.res.onDemand, maxRelay: MAX_RELAY },
       stats: Object.assign({}, stats),
@@ -710,9 +711,23 @@ const SF={net:['dhcp','ip','mask','gw','dns','hostname'],dns:['upstream1','upstr
  res:['onDemand','interval','timeoutMs','extraBcast','nbns','llmnr','mdns','passive','scanSubnets','dnsLookup'],time:['tz','ntp'],auth:['user','pass']};
 async function loadSettings(){try{C=await api('/api/config')}catch(e){toast(e.message);return}
  for(const g in SF)SF[g].forEach(k=>{const e=$('#s_'+k);if(!e)return;const v=C[g]?.[k];if(e.type==='checkbox')e.checked=!!v;else e.value=v??''});togDhcp()}
-function togDhcp(){const on=$('#s_dhcp').checked;['ip','mask','gw','dns'].forEach(k=>$('#s_'+k).disabled=on)}
-$('#s_dhcp').onchange=togDhcp;
+// Switching DHCP off fills Mask / Gateway / DNS with what DHCP gave the ESP32 right now; the IP is left to the user.
+function togDhcp(fromUser){const on=$('#s_dhcp').checked,d=S&&S.device,ok=v=>v&&v!=='0.0.0.0';
+ ['ip','mask','gw','dns'].forEach(k=>$('#s_'+k).disabled=on);
+ $('#s_ip').placeholder=d&&ok(d.ip)?'เช่น '+d.ip:'';
+ const note=$('#netAuto');note.style.display='none';
+ if(on||!fromUser||!d)return;
+ if(ok(d.mask))$('#s_mask').value=d.mask;if(ok(d.gw))$('#s_gw').value=d.gw;
+ $('#s_dns').value=ok(d.dns)&&d.dns!==d.ip?d.dns:ok(d.gw)?d.gw:'';
+ $('#s_ip').value='';$('#s_ip').focus();
+ note.textContent=`เติม Subnet Mask / Gateway / DNS จากค่าที่ ESP32 ได้รับจาก DHCP ตอนนี้แล้ว – กรอก IP Address เอง แล้วกด บันทึกการตั้งค่า`;note.style.display=''}
+$('#s_dhcp').onchange=()=>togDhcp(true);
+const isIp=v=>/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.test(v)&&v.split('.').every(n=>n<256);
 async function saveSettings(ev){ev.preventDefault();const b={};
+ if(!$('#s_dhcp').checked){const ip=$('#s_ip').value.trim(),gw=$('#s_gw').value.trim(),dns=$('#s_dns').value.trim(),m=$('#s_mask').value.trim();
+  const bad=!isIp(ip)?'กรุณากรอก IP Address ให้ถูกต้อง':!isIp(m)?'Subnet Mask ไม่ถูกต้อง':!isIp(gw)?'Gateway ไม่ถูกต้อง':ip===gw?'IP Address ซ้ำกับ Gateway':
+   dns&&!isIp(dns)?'DNS ไม่ถูกต้อง':dns===ip?'DNS ของ ESP32 ห้ามเป็น IP ของ ESP32 เอง (จะถามวนกลับมาที่ตัวเอง)':'';
+  if(bad){toast(bad,6000);$('#s_ip').focus();return}}
  for(const g in SF){b[g]={};SF[g].forEach(k=>{const e=$('#s_'+k);b[g][k]=e.type==='checkbox'?e.checked:e.type==='number'?Number(e.value):e.value.trim()})}
  try{const r=await post('/api/settings',b);$('#s_pass').value='';
   if(r.reboot){if(confirm('บันทึกแล้ว ต้องรีบูตเพื่อใช้ค่าเครือข่าย/เวลาใหม่ รีบูตเลยหรือไม่?'))reboot(true)}else toast('บันทึกการตั้งค่าแล้ว')}catch(e){toast('ผิดพลาด: '+e.message,6000)}}
