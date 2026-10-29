@@ -236,6 +236,27 @@ namespace XeroxBookSync
             UseWaitCursor = b;
         }
 
+        // A name that no one has as a Windows account: with a share open to Everyone it gets in as Guest.
+        const string DefaultLogin = "xerox-scan";
+
+        // The PC refused the login (relay log from the ESP32), or - without that log - SMB failed while ping worked.
+        internal static bool LooksLikeAccount(string relayError, TestResult t)
+        {
+            if (relayError.Contains("ล็อกอินไม่ผ่าน") || relayError.Contains("บัญชีถูกล็อก") || relayError.Contains("บัญชีถูกปิด")) return true;
+            if (relayError.Length > 0) return false;
+            var step = t.Steps.ToDictionary(s => s.Key, s => s.Value);
+            string ping, dest;
+            return step.TryGetValue("Ping Test", out ping) && ping == "Passed" && step.TryGetValue("Destination Server Test", out dest) && dest == "Failed";
+        }
+
+        // xerox-scan -> xerox-scan-2 -> xerox-scan-3 ... ; any other name -> xerox-scan
+        internal static string AltLogin(string login)
+        {
+            if (string.Equals(login, DefaultLogin, StringComparison.OrdinalIgnoreCase)) return DefaultLogin + "-2";
+            Match m = Regex.Match(login, "^" + DefaultLogin + "-(\\d+)$", RegexOptions.IgnoreCase);
+            return m.Success ? DefaultLogin + "-" + (int.Parse(m.Groups[1].Value) + 1) : DefaultLogin;
+        }
+
         static string NickOf(Host h)
         {
             string first = (h.ScanName ?? "").Split(',')[0];
@@ -259,7 +280,7 @@ namespace XeroxBookSync
                 {
                     Host = h, HasRelay = h.RelayPort > 0, Check = h.RelayPort > 0, Nick = nick,
                     // Login: a name that is NOT an account on the PC gets in as Guest without a password
-                    Share = h.Share.Length > 0 ? h.Share : "scan", Login = h.Login.Length > 0 ? h.Login : "xerox", Path = h.DocPath,
+                    Share = h.Share.Length > 0 ? h.Share : "scan", Login = h.Login.Length > 0 ? h.Login : DefaultLogin, Path = h.DocPath,
                     InXerox = xrx == null ? "ยังไม่ได้เชื่อมต่อ" : ""
                 });
             }
@@ -320,7 +341,7 @@ namespace XeroxBookSync
             var step = t.Steps.ToDictionary(s => s.Key, s => s.Value);
             string v;
             if (step.TryGetValue("Ping Test", out v) && v == "Failed") return "Xerox ping ESP32 ไม่ได้ – ตรวจ IP ของ ESP32 / สาย LAN";
-            if (step.TryGetValue("Destination Server Test", out v) && v == "Failed") return "ต่อหรือล็อกอิน SMB ไม่ได้ – Login Name อาจตรงกับบัญชีจริงบน PC (ไม่แยกตัวพิมพ์ เช่น ta = TA) ให้ใช้ชื่อที่ไม่มีบน PC เช่น xerox · หรือ Share ผิด / PC ปิด";
+            if (step.TryGetValue("Destination Server Test", out v) && v == "Failed") return "ต่อหรือล็อกอิน SMB ไม่ได้ – Login Name อาจตรงกับบัญชีจริงบน PC (ไม่แยกตัวพิมพ์ เช่น ta = TA) ให้ใช้ชื่อที่ไม่มีบน PC เช่น xerox-scan · หรือ Share ผิด / PC ปิด";
             if (step.TryGetValue("File Write Test", out v) && v == "Failed") return "เข้าแชร์ได้แต่เขียนไฟล์ไม่ได้ – Document Path ไม่มีอยู่ในแชร์ (เว้นว่าง = เก็บในโฟลเดอร์ Share) หรือไม่มีสิทธิ์เขียน";
             if (step.TryGetValue("File Remove Test", out v) && v == "Failed") return "เขียนไฟล์ได้แต่ลบไม่ได้ – ให้สิทธิ์ Modify กับโฟลเดอร์";
             return t.Failed();
@@ -357,6 +378,22 @@ namespace XeroxBookSync
                     TestResult t = await Task.Run(() => TestWithRelogin(e));
                     string detail = string.Join(" · ", t.Steps.Select(s => s.Key.Replace(" Test", "") + " " + s.Value));
                     Log(r.Nick + " → " + e.Ip + ":" + e.Port + "  Destination Test: " + t.Summary + "  [" + detail + "]");
+                    if (!t.Valid && e.Password.Length == 0)
+                    {
+                        // Login Name may be a real account on that PC: try once more with a name that is not
+                        // (one attempt only, a refused real account counts toward its lockout).
+                        Row cur = r;
+                        string why0 = await Task.Run(() => esp.LastRelayError(cur.Host.Name));
+                        if (LooksLikeAccount(why0, t))
+                        {
+                            string alt = AltLogin(e.Login);
+                            Log("  Login Name \"" + e.Login + "\" ใช้ไม่ได้บน PC นี้" + (why0.Length > 0 ? " (" + why0 + ")" : "") + " → ลองใหม่ด้วย \"" + alt + "\"");
+                            var e2 = new Entry { Nick = e.Nick, Ip = e.Ip, Port = e.Port, Share = e.Share, Login = alt, Path = e.Path, Password = "" };
+                            TestResult t2 = await Task.Run(() => TestWithRelogin(e2));
+                            Log("  " + alt + ": " + t2.Summary);
+                            if (t2.Valid) { e = e2; t = t2; r.Login = alt; grid.Invalidate(); }
+                        }
+                    }
                     if (!t.Valid)
                     {
                         Row cur = r;

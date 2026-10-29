@@ -1,4 +1,4 @@
-Xerox Address Book Sync v1.0.1  (Xerox Host DNS Bridge)
+Xerox Address Book Sync v1.0.2  (Xerox Host DNS Bridge)
 =====================================================
 
 เพิ่มรายการ Scan ของ ESP32 (Xerox Host DNS Bridge) เข้าสมุดที่อยู่ของเครื่อง Xerox AltaLink อัตโนมัติ
@@ -10,7 +10,7 @@ Xerox Address Book Sync v1.0.1  (Xerox Host DNS Bridge)
 First Name / Display Name / Nickname = ชื่อ Scan (ชื่อแรกในช่อง "ชื่อ Scan" ของ Host ใน ESP32 ถ้าว่างใช้ชื่อ Host)
 Protocol = SMB, Address Type = IPv4 Address
 IP Address : Port = IP ของ ESP32 : พอร์ต Relay ของ Host
-Share / Document Path / Login Name = ตามตาราง (ค่าเริ่มต้น Share = scan, Login Name = xerox)
+Share / Document Path / Login Name = ตามตาราง (ค่าเริ่มต้น Share = scan, Login Name = xerox-scan)
   Login Name ต้องไม่ตรงกับบัญชีที่มีอยู่บน PC (ชื่อไม่แยกตัวพิมพ์ เช่น ta = TA) ถ้าตรง Windows จะขอรหัสของบัญชีนั้น
   Document Path = โฟลเดอร์ย่อยภายใน Share ต้องมีอยู่จริง เว้นว่าง = เก็บในโฟลเดอร์ Share
 Password = ช่อง "รหัสผ่านของ PC" (เว้นว่างได้ถ้าโฟลเดอร์แชร์ไม่ต้องใช้รหัส)
@@ -22,6 +22,8 @@ Password = ช่อง "รหัสผ่านของ PC" (เว้นว�
    รายการที่มีชื่อนี้ใน Xerox แล้วจะขึ้น "มีแล้ว" และไม่ถูกติ๊ก
 3. ติ๊กรายการ แก้ชื่อ Scan / Share / Login / Path ได้ในตาราง
 4. "เพิ่มเข้า Xerox" = Destination Test ก่อน ผ่านแล้วจึง Save และตรวจว่ามีในสมุดที่อยู่จริง
+   ถ้าไม่ผ่านเพราะ Login Name ไปตรงกับบัญชีจริงบน PC (และไม่ได้ใส่รหัสผ่าน) โปรแกรมจะเปลี่ยนเป็น
+   xerox-scan / xerox-scan-2 / xerox-scan-3 … แล้วทดสอบใหม่ให้เอง 1 ครั้ง (ไม่ลองซ้ำ เพื่อไม่ให้บัญชีของ PC ถูกล็อก)
    "ทดสอบที่เลือก" = Destination Test อย่างเดียว ไม่บันทึก
    รายการที่ทดสอบไม่ผ่านจะไม่ถูกบันทึก (เว้นแต่ติ๊ก "บันทึกแม้ Destination Test ไม่ผ่าน") และบอกสาเหตุในคอลัมน์ผลล่าสุด
 5. ถ้าติ๊ก "จำ Share / Login / Path ไว้ใน ESP32" ค่าที่ใช้จะถูกบันทึกกลับใน Host ของ ESP32 (ESP32 v1.8.0 ขึ้นไป)
