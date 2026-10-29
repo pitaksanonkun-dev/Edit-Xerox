@@ -11,8 +11,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyTitle("XeroxBookSync")]
 [assembly: System.Reflection.AssemblyDescription("Add Xerox Host DNS Bridge scan destinations to a Xerox address book")]
 [assembly: System.Reflection.AssemblyProduct("Xerox Host DNS Bridge")]
-[assembly: System.Reflection.AssemblyVersion("1.0.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.0.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.0.1.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.0.1.0")]
 
 namespace XeroxBookSync
 {

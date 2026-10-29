@@ -1,4 +1,4 @@
-Xerox Address Book Sync v1.0  (Xerox Host DNS Bridge)
+Xerox Address Book Sync v1.0.1  (Xerox Host DNS Bridge)
 =====================================================
 
 เพิ่มรายการ Scan ของ ESP32 (Xerox Host DNS Bridge) เข้าสมุดที่อยู่ของเครื่อง Xerox AltaLink อัตโนมัติ
