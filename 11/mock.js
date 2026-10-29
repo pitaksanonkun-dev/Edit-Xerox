@@ -30,7 +30,7 @@
     relayJobs: 0, relayFails: 0, relayBytes: 0, relayLast: ''
   }, o);
   let hosts = [
-    H('PC-ACC01', { scanName: 'test (Xerox ชั้น 2)', mac: 'A4:BB:6D:12:34:56', note: 'แผนกบัญชี', relayPort: 4451, ipv4: '192.168.20.86', ipv6: ['fd00:20::86', 'fe80::4a1:22ff:fe33:86'], method: 'ARP (MAC)', seenMs: Date.now() - 4000, dnsHits: 8, relayJobs: 37, relayBytes: 412e6, relayLast: ago(600) }),
+    H('PC-ACC01', { scanName: 'test (Xerox ชั้น 2)', share: 'scan', login: 'scan', mac: 'A4:BB:6D:12:34:56', note: 'แผนกบัญชี', relayPort: 4451, ipv4: '192.168.20.86', ipv6: ['fd00:20::86', 'fe80::4a1:22ff:fe33:86'], method: 'ARP (MAC)', seenMs: Date.now() - 4000, dnsHits: 8, relayJobs: 37, relayBytes: 412e6, relayLast: ago(600) }),
     H('PC-HR01', { scanName: 'HR-Scan (Xerox ชั้น 3)', mac: '30:9C:23:AB:CD:01', note: 'ฝ่ายบุคคล (IP จาก DHCP เปลี่ยนบ่อย)', relayPort: 4452, ipv4: '192.168.20.131', method: 'LLMNR', seenMs: Date.now() - 12000, relayJobs: 15, relayFails: 1, relayBytes: 96e6, relayLast: ago(3400) }),
     H('PC-SALES03', { note: 'สาขา – อยู่คนละวง LAN (192.168.30.x)', relayPort: 4453, ipv4: '192.168.30.45', method: 'NetBIOS-Scan', seenMs: Date.now() - 21000, relayJobs: 6, relayBytes: 58e6, relayLast: ago(86000) }),
     H('NB-IT05', { scanName: 'IT-Notebook (Xerox ชั้น 2)', aliases: 'scan-it, nb-it05.company.local', note: 'Notebook IT', ipv4: '192.168.20.77', ipv6: ['fd00:20::77'], method: 'mDNS', seenMs: Date.now() - 9000, dnsHits: 23 }),
@@ -250,12 +250,12 @@
   }
   function status() {
     return {
-      device: { fw: '1.7.0', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
+      device: { fw: '1.8.0', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
         ip: cfg.net.ip, mask: cfg.net.mask, gw: cfg.net.gw, dns: cfg.net.dns, dhcp: cfg.net.dhcp, uptime: uptime(),
         time: now(), heap: 182344 - sessions.length * 9000, interval: cfg.res.interval, onDemand: cfg.res.onDemand, maxRelay: MAX_RELAY, user: cfg.auth.user, netFallback: false, netReason: '', ipv6: 'fe80::aa03:2aff:fe6f:1234' },
       stats: Object.assign({}, stats), conflict: { active: false },
       hosts: hosts.map(h => ({
-        name: h.name, scanName: h.scanName || '', mac: h.mac, aliases: h.aliases, fallback4: h.fallback4, fallback6: h.fallback6, note: h.note, enabled: h.enabled,
+        name: h.name, scanName: h.scanName || '', mac: h.mac, aliases: h.aliases, fallback4: h.fallback4, fallback6: h.fallback6, note: h.note, enabled: h.enabled, share: h.share || '', docPath: h.docPath || '', login: h.login || '',
         ipv4: h.ipv4, ipv6: h.ipv6, method: h.method, lastSeen: h.lastSeen, ago: h.seenMs ? Math.floor((Date.now() - h.seenMs) / 1000) : -1,
         fails: h.fails, rounds: h.rounds, dnsHits: h.dnsHits, relayPort: h.relayPort, relayJobs: h.relayJobs,
         relayFails: h.relayFails, relayBytes: Math.round(h.relayBytes), relayLast: h.relayLast,
@@ -306,7 +306,8 @@
       }
       case 'POST /api/hosts': {
         const list = body.map(h => ({ name: String(h.name || '').trim(), scanName: String(h.scanName || '').trim(), mac: String(h.mac || '').trim(), aliases: h.aliases || '', fallback4: h.fallback4 || '',
-          fallback6: h.fallback6 || '', note: h.note || '', enabled: h.enabled !== false, relayPort: Number(h.relayPort) || 0 }));
+          fallback6: h.fallback6 || '', note: h.note || '', enabled: h.enabled !== false, relayPort: Number(h.relayPort) || 0,
+          share: h.share || '', docPath: h.docPath || '', login: h.login || '' }));
         const e = validateHosts(list);
         if (e) return err(e);
         setHosts(list);

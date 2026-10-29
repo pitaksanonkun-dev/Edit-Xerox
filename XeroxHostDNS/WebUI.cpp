@@ -224,6 +224,7 @@ static void handleStatus() {
     o["relayPort"] = c.relayPort;
     o["mac"] = c.mac;
     o["scanName"] = c.scanName;
+    o["share"] = c.share; o["docPath"] = c.docPath; o["login"] = c.login;
     o["relayJobs"] = h.relayJobs;
     o["relayFails"] = h.relayFails;
     o["relayBytes"] = h.relayBytes;

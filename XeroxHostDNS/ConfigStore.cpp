@@ -39,6 +39,9 @@ void hostsFromJson(JsonArrayConst a, std::vector<HostCfg>& out) {
     uint32_t rp = juint(v["relayPort"], 0);
     h.relayPort = rp <= 65535 ? rp : 0;
     h.scanName  = jstr(v["scanName"], "");
+    h.share     = jstr(v["share"], "");
+    h.docPath   = jstr(v["docPath"], "");
+    h.login     = jstr(v["login"], "");
     h.mac       = jstr(v["mac"], "");
     uint8_t m[6];
     if (parseMac(h.mac, m)) h.mac = macStr(m);   // normalise to AA:BB:CC:DD:EE:FF
@@ -83,6 +86,7 @@ String validateHosts(const std::vector<HostCfg>& list) {
     for (size_t j = 0; j < i; j++)
       if (list[j].name.equalsIgnoreCase(h.name)) return "ชื่อ Host ซ้ำ: " + h.name;
     if (h.scanName.length() > 200) return "ชื่อ Scan ยาวเกิน 200 ตัวอักษร: " + h.name;
+    if (h.share.length() > 80 || h.docPath.length() > 200 || h.login.length() > 64) return "Share / Path / Login ยาวเกินไป: " + h.name;
     uint32_t v4; uint8_t v6[16], mac[6];
     if (h.mac.length()) {
       if (!parseMac(h.mac, mac) || !macValid(mac)) return "MAC Address ไม่ถูกต้อง: " + h.mac;
@@ -175,6 +179,9 @@ void configToJson(JsonDocument& doc, bool withSecrets) {
     o["relayPort"] = h.relayPort;
     o["mac"] = h.mac;
     o["scanName"] = h.scanName;
+    if (h.share.length()) o["share"] = h.share;
+    if (h.docPath.length()) o["docPath"] = h.docPath;
+    if (h.login.length()) o["login"] = h.login;
   }
 }
 

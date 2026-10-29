@@ -5,7 +5,7 @@
 #include <Arduino.h>
 #include <vector>
 
-#define FW_VERSION      "1.7.0"
+#define FW_VERSION      "1.8.0"
 #define MAX_HOSTS       100
 #define MAX_PRINTERS    32
 #define MAX_V6          4
@@ -86,6 +86,7 @@ struct HostCfg {
   uint16_t relayPort = 0;          // ESP32 TCP port relayed to <host>:445 (0 = off)
   String mac;                      // optional "AA:BB:CC:DD:EE:FF": track the PC by MAC (ARP)
   String scanName;                 // Scan destination nickname(s) in the copiers, e.g. "test (Xerox ชั้น 2)"
+  String share, docPath, login;    // SMB share / folder / user on the PC: only for the CSV export to the copier
 };
 
 struct AppConfig {
