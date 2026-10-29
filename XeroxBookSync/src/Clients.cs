@@ -122,19 +122,31 @@ namespace XeroxBookSync
 
         static readonly string[] HostFields = { "name", "scanName", "mac", "aliases", "fallback4", "fallback6", "note", "enabled", "relayPort", "share", "docPath", "login" };
 
-        // Writes the host list back (only the fields the ESP32 accepts). null = OK
+        // Writes share / login / path / scan name of our hosts back. The ESP32 replaces its whole host list
+        // on save, so the current list is read again first and only those fields of hosts with the same
+        // name are changed: hosts added, edited or removed meanwhile in the web UI are kept as they are.
         public string SaveHosts()
         {
+            var mine = Hosts.ToDictionary(h => h.Name, StringComparer.OrdinalIgnoreCase);
+            var fresh = new Esp32 { Address = Address, User = User, Pass = Pass };
+            string err = fresh.Load();
+            if (err != null) return err;
+            if (fresh.Hosts.Count == 0) return "ESP32 ไม่มี Host – ไม่บันทึก";
             var list = new List<Dictionary<string, object>>();
-            foreach (Host h in Hosts)
+            foreach (Host cur in fresh.Hosts)
             {
                 var o = new Dictionary<string, object>();
                 foreach (string k in HostFields)
                 {
                     object v;
-                    if (h.Raw.TryGetValue(k, out v)) o[k] = v;
+                    if (cur.Raw.TryGetValue(k, out v)) o[k] = v;
                 }
-                o["scanName"] = h.ScanName; o["share"] = h.Share; o["login"] = h.Login; o["docPath"] = h.DocPath;
+                Host h;
+                if (mine.TryGetValue(cur.Name, out h))
+                {
+                    o["share"] = h.Share; o["login"] = h.Login; o["docPath"] = h.DocPath;
+                    if (cur.ScanName.Length == 0) o["scanName"] = h.ScanName;
+                }
                 list.Add(o);
             }
             try
