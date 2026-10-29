@@ -416,7 +416,7 @@ const LOGIN_PAGE = "<!doctype html>\n<html lang=\"th\"><head><meta charset=\"utf
   }
   function status() {
     return {
-      device: { fw: '1.8.1', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
+      device: { fw: '1.8.2', hostname: cfg.net.hostname, mac: 'A8:03:2A:6F:12:34', link: true, speed: 100, duplex: 'Full',
         ip: cfg.net.ip, mask: cfg.net.mask, gw: cfg.net.gw, dns: cfg.net.dns, dhcp: cfg.net.dhcp, uptime: uptime(),
         time: now(), heap: 182344 - sessions.length * 9000, interval: cfg.res.interval, onDemand: cfg.res.onDemand, maxRelay: MAX_RELAY, user: cfg.auth.user, netFallback: false, netReason: '', ipv6: 'fe80::aa03:2aff:fe6f:1234' },
       stats: Object.assign({}, stats), conflict: { active: false },
@@ -652,7 +652,7 @@ function editHost(i){const v=i<0?{}:S.hosts[i];dialog(i<0?'เพิ่ม Host'
  {k:'mac',l:'MAC Address (แนะนำ – ค้นหาแม่นยำที่สุด)',ph:'AA:BB:CC:DD:EE:FF',h:'ESP32 ตามหาเครื่องจาก MAC ด้วย ARP ซึ่ง Firewall ของ Windows ปิดกั้นไม่ได้ (เครื่องในวง LAN เดียวกัน)'},
  {k:'aliases',l:'ชื่อแฝง (คั่นด้วย ,)',ph:'scan-acc, pc-acc01.company.local',h:'ชื่ออื่นที่ตั้งไว้ในเครื่อง Xerox ให้ชี้ไปเครื่องเดียวกัน'},
  {k:'relayPort',l:'พอร์ต Relay (เว้นว่าง = ไม่ใช้)',def:i<0&&S.hosts.filter(h=>h.relayPort).length<S.device.maxRelay?nextPort():'',ph:'4451',h:`เครื่อง Xerox ส่งมาที่ ${esc(S.device.ip)}:พอร์ตนี้ แล้ว ESP32 ส่งต่อไปที่ Host นี้พอร์ต 445 (สูงสุด ${S.device.maxRelay} Host)`},
- {k:'share',l:'Share ของ PC (สำหรับ Export CSV ไป Xerox)',ph:'scan',h:'ชื่อโฟลเดอร์ที่แชร์ไว้บน PC – ESP32 ไม่ได้ใช้ ใช้ตอน Export CSV เท่านั้น'},{k:'docPath',l:'Document Path (โฟลเดอร์ย่อย ถ้ามี)'},{k:'login',l:'Login Name ของ PC',ph:'scan'},
+ {k:'share',l:'Share ของ PC (สำหรับ Export CSV ไป Xerox)',ph:'scan',h:'ชื่อโฟลเดอร์ที่แชร์ไว้บน PC – ESP32 ไม่ได้ใช้ ใช้ตอน Export CSV เท่านั้น'},{k:'docPath',l:'Document Path (โฟลเดอร์ย่อย ถ้ามี)',h:'เว้นว่าง = เก็บไฟล์ในโฟลเดอร์ Share เลย · ถ้าใส่ โฟลเดอร์ย่อยนี้ต้องมีอยู่จริงใน Share'},{k:'login',l:'Login Name ของ PC',def:'xerox',ph:'xerox',h:'ค่าเริ่มต้น xerox ใช้กับ PC ที่แชร์ให้ Everyone โดยไม่ต้องใช้รหัส · ห้ามใช้ชื่อที่เป็นบัญชีจริงบน PC (ไม่แยกตัวพิมพ์ เช่น ta = TA) ยกเว้นจะใส่รหัสของบัญชีนั้นใน Xerox'},
  {k:'fallback4',l:'IPv4 สำรอง',ph:'192.168.1.50',h:'ใช้เมื่อยังค้นหาไม่พบเลยเท่านั้น'},{k:'fallback6',l:'IPv6 สำรอง'},{k:'note',l:'หมายเหตุ',ph:'แผนกบัญชี'},{k:'enabled',l:'เปิดใช้งาน',t:'chk'}],v,
  async o=>{o.relayPort=Number(o.relayPort)||0;o.mac=normMac(o.mac)||o.mac;const l=hostCfg();if(i<0)l.push(o);else l[i]=o;await post('/api/hosts',l)},
  `<div class="bar" style="margin:4px 0 0"><button type="button" class="btn" onclick="scanNet()">🔍 สแกนหาเครื่องในเครือข่าย</button>
@@ -889,7 +889,7 @@ async function applyImport(){const l=hostCfg(),sel=IMP.filter(e=>e.on),prn=$('#i
   const name=cleanName(e.name);if(!name)throw new Error(`กรุณากรอก Host Name ของ "${e.scan}"`);
   if(e.mac&&!normMac(e.mac))throw new Error(`MAC ของ "${e.scan}" ไม่ถูกต้อง`);
   const d=e.src[0].display;
-  l.push({name,scanName:scan,mac:normMac(e.mac),aliases:'',fallback4:e.fallback4,fallback6:'',note:d&&d!==e.src[0].nick?d:'',enabled:true,relayPort:port,share:sx.share,docPath:sx.path,login:sx.login})}
+  l.push({name,scanName:scan,mac:normMac(e.mac),aliases:'',fallback4:e.fallback4,fallback6:'',note:d&&d!==e.src[0].nick?d:'',enabled:true,relayPort:port,share:sx.share,docPath:sx.path,login:sx.login||'xerox'})}
  await post('/api/hosts',l);return `นำเข้าแล้ว ${sel.length} รายการ`}
 
 // ---- Export to the copier: Xerox address book CSV for "Import From File" ----
@@ -897,7 +897,7 @@ async function applyImport(){const l=hostCfg(),sel=IMP.filter(e=>e.on),prn=$('#i
 let EXP=[];
 function exportXerox(){
  EXP=S.hosts.filter(h=>h.enabled).map(h=>({on:true,host:h.name,nick:(String(h.scanName||'').split(',')[0]||'').replace(/\s*\([^)]*\)\s*$/,'').trim()||h.name,
-  addr:h.relayPort?S.device.ip:h.name,port:h.relayPort||445,share:h.share||'',path:h.docPath||'',login:h.login||'',pass:''}));
+  addr:h.relayPort?S.device.ip:h.name,port:h.relayPort||445,share:h.share||'scan',path:h.docPath||'',login:h.login||'xerox',pass:''}));
  if(!EXP.length){toast('ยังไม่มี Host');return}
  customDialog('Export CSV ไปนำเข้าที่ Xerox (Import From File)','min(1180px,97vw)','⬇ ดาวน์โหลดไฟล์ CSV',
   `<div class="hint" style="margin-bottom:6px">ตรวจ/แก้ข้อมูลแล้วกดดาวน์โหลด จากนั้นที่หน้าเว็บของ Xerox: <b>Address Book → Management → Import From File</b> เลือกไฟล์นี้ (เลือกแบบ <b>เพิ่มต่อจากรายการเดิม</b> ถ้ามีให้เลือก) ·
