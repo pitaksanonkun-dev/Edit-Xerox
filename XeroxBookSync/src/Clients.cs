@@ -99,6 +99,27 @@ namespace XeroxBookSync
             catch (Exception ex) { return "อ่านข้อมูลจาก ESP32 ไม่ได้: " + ex.Message; }
         }
 
+        // Newest failed relay entry of this host (the ESP32 decodes the SMB error, e.g. which login was refused).
+        public string LastRelayError(string host)
+        {
+            try
+            {
+                string json = Read(Req("/api/status", "GET").GetResponse());
+                var root = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Deserialize<Dictionary<string, object>>(json);
+                object rl;
+                if (!root.TryGetValue("relays", out rl) || !(rl is ArrayList)) return "";
+                foreach (Dictionary<string, object> r in (ArrayList)rl)       // newest first
+                {
+                    if (!string.Equals(S(r, "host"), host, StringComparison.OrdinalIgnoreCase)) continue;
+                    DateTime t;
+                    if (DateTime.TryParse(S(r, "time"), out t) && Math.Abs((DateTime.Now - t).TotalSeconds) > 90) return "";
+                    return S(r, "ok") == "True" ? "" : S(r, "result");
+                }
+            }
+            catch { }
+            return "";
+        }
+
         static readonly string[] HostFields = { "name", "scanName", "mac", "aliases", "fallback4", "fallback6", "note", "enabled", "relayPort", "share", "docPath", "login" };
 
         // Writes the host list back (only the fields the ESP32 accepts). null = OK

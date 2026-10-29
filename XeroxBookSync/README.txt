@@ -10,7 +10,9 @@ Xerox Address Book Sync v1.0  (Xerox Host DNS Bridge)
 First Name / Display Name / Nickname = ชื่อ Scan (ชื่อแรกในช่อง "ชื่อ Scan" ของ Host ใน ESP32 ถ้าว่างใช้ชื่อ Host)
 Protocol = SMB, Address Type = IPv4 Address
 IP Address : Port = IP ของ ESP32 : พอร์ต Relay ของ Host
-Share / Document Path / Login Name = ตามตาราง (ค่าเริ่มต้น Share = scan, Login Name = ชื่อ Scan)
+Share / Document Path / Login Name = ตามตาราง (ค่าเริ่มต้น Share = scan, Login Name = xerox)
+  Login Name ต้องไม่ตรงกับบัญชีที่มีอยู่บน PC (ชื่อไม่แยกตัวพิมพ์ เช่น ta = TA) ถ้าตรง Windows จะขอรหัสของบัญชีนั้น
+  Document Path = โฟลเดอร์ย่อยภายใน Share ต้องมีอยู่จริง เว้นว่าง = เก็บในโฟลเดอร์ Share
 Password = ช่อง "รหัสผ่านของ PC" (เว้นว่างได้ถ้าโฟลเดอร์แชร์ไม่ต้องใช้รหัส)
 
 วิธีใช้

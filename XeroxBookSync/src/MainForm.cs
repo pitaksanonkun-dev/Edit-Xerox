@@ -258,7 +258,8 @@ namespace XeroxBookSync
                 rows.Add(new Row
                 {
                     Host = h, HasRelay = h.RelayPort > 0, Check = h.RelayPort > 0, Nick = nick,
-                    Share = h.Share.Length > 0 ? h.Share : "scan", Login = h.Login.Length > 0 ? h.Login : nick, Path = h.DocPath,
+                    // Login: a name that is NOT an account on the PC gets in as Guest without a password
+                    Share = h.Share.Length > 0 ? h.Share : "scan", Login = h.Login.Length > 0 ? h.Login : "xerox", Path = h.DocPath,
                     InXerox = xrx == null ? "ยังไม่ได้เชื่อมต่อ" : ""
                 });
             }
@@ -319,8 +320,8 @@ namespace XeroxBookSync
             var step = t.Steps.ToDictionary(s => s.Key, s => s.Value);
             string v;
             if (step.TryGetValue("Ping Test", out v) && v == "Failed") return "Xerox ping ESP32 ไม่ได้ – ตรวจ IP ของ ESP32 / สาย LAN";
-            if (step.TryGetValue("Destination Server Test", out v) && v == "Failed") return "ต่อ SMB ไม่ได้ – พอร์ตไม่มีใน ESP32, PC ปิดอยู่ หรือชื่อ Share / Login ไม่ถูก (ดู Log Relay ใน ESP32)";
-            if (step.TryGetValue("File Write Test", out v) && v == "Failed") return "เข้าแชร์ได้แต่เขียนไฟล์ไม่ได้ – ตรวจสิทธิ์เขียนของโฟลเดอร์";
+            if (step.TryGetValue("Destination Server Test", out v) && v == "Failed") return "ต่อหรือล็อกอิน SMB ไม่ได้ – Login Name อาจตรงกับบัญชีจริงบน PC (ไม่แยกตัวพิมพ์ เช่น ta = TA) ให้ใช้ชื่อที่ไม่มีบน PC เช่น xerox · หรือ Share ผิด / PC ปิด";
+            if (step.TryGetValue("File Write Test", out v) && v == "Failed") return "เข้าแชร์ได้แต่เขียนไฟล์ไม่ได้ – Document Path ไม่มีอยู่ในแชร์ (เว้นว่าง = เก็บในโฟลเดอร์ Share) หรือไม่มีสิทธิ์เขียน";
             if (step.TryGetValue("File Remove Test", out v) && v == "Failed") return "เขียนไฟล์ได้แต่ลบไม่ได้ – ให้สิทธิ์ Modify กับโฟลเดอร์";
             return t.Failed();
         }
@@ -358,7 +359,10 @@ namespace XeroxBookSync
                     Log(r.Nick + " → " + e.Ip + ":" + e.Port + "  Destination Test: " + t.Summary + "  [" + detail + "]");
                     if (!t.Valid)
                     {
-                        r.Result = "ทดสอบไม่ผ่าน: " + Explain(t); r.ResultColor = Theme.Danger;
+                        Row cur = r;
+                        string why = await Task.Run(() => esp.LastRelayError(cur.Host.Name));
+                        r.Result = "ทดสอบไม่ผ่าน: " + (why.Length > 0 ? why : Explain(t)); r.ResultColor = Theme.Danger;
+                        if (why.Length > 0) Log("  สาเหตุจาก ESP32: " + why);
                         if (!save || !force) { fail++; grid.Invalidate(); continue; }
                     }
                     else { r.Result = "ทดสอบผ่าน"; r.ResultColor = Theme.Success; }
