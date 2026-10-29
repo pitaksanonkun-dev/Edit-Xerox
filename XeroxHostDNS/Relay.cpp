@@ -209,7 +209,9 @@ static void smbFeed(Session& s, bool request, const uint8_t* d, int n) {
 static String smbReason(const Session& s) {
   String who = s.user.length() ? " (ผู้ใช้ " + s.user + ")" : "";
   switch (s.err) {
-    case 0xC000006D: return s.emptyPw ? "ล็อกอินไม่ผ่าน: Xerox ส่งรหัสผ่านว่าง – ใส่ Password ใหม่และติ๊ก Select to save new password" + who
+    // Blank password: a PC that shares to Everyone lets unknown names in as Guest, but a name that is
+    // a real account on the PC must come with that account's password.
+    case 0xC000006D: return s.emptyPw ? "ล็อกอินไม่ผ่าน: ไม่มีรหัสผ่าน แต่ Login Name นี้เป็นบัญชีจริงบน PC – ใส่รหัสของบัญชีนี้ใน Xerox (ติ๊ก Select to save new password) หรือเปลี่ยน Login Name เป็นชื่อที่ไม่มีบน PC เช่น xerox" + who
                                       : "ล็อกอินไม่ผ่าน: ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" + who;
     case 0xC0000234: return "บัญชีถูกล็อกเพราะใส่รหัสผิดหลายครั้ง – รอประมาณ 10 นาทีหรือปลดล็อกที่ PC" + who;
     case 0xC0000072: return "บัญชีถูกปิดใช้งานที่ PC" + who;
